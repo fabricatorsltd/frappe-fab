@@ -1,0 +1,52 @@
+{
+ "app": "fab",
+ "creation": "2026-04-27 13:30:00",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "for_user": "",
+ "header_icon": "bank",
+ "idx": 1,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Home",
+   "link_to": "Banks Import",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Banks",
+   "link_to": "Bank",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Bank Accounts",
+   "link_to": "Bank Account",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-04-27 13:23:49.880717",
+ "modified_by": "Administrator",
+ "module": "FAB",
+ "name": "Banks Import",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Banks Import"
+}

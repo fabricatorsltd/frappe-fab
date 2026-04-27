@@ -1,0 +1,41 @@
+{
+ "app": "fab",
+ "creation": "2026-04-27 13:30:00",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "for_user": "",
+ "header_icon": "network",
+ "idx": 1,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Home",
+   "link_to": "OpenAPI",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "OpenAPI Connections",
+   "link_to": "OpenAPI Connection",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-04-27 13:23:50.153725",
+ "modified_by": "Administrator",
+ "module": "FAB",
+ "name": "OpenAPI",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "OpenAPI"
+}

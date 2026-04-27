@@ -1,0 +1,63 @@
+{
+ "app": "fab",
+ "creation": "2026-04-27 13:30:00",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "for_user": "",
+ "header_icon": "change",
+ "idx": 1,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Home",
+   "link_to": "Exchange Rate Sync",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Exchange Rate Sync Settings",
+   "link_to": "Exchange Rate Sync Settings",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Exchange Rate Providers",
+   "link_to": "Exchange Rate Provider",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Exchange Rate Pairs",
+   "link_to": "Exchange Rate Pair",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-04-27 13:23:50.130747",
+ "modified_by": "Administrator",
+ "module": "FAB",
+ "name": "Exchange Rate Sync",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Exchange Rate Sync"
+}
