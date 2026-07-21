@@ -1,0 +1,50 @@
+{
+ "app": "fab",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "header_icon": "file",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Home",
+   "link_to": "F24",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "F24 Payments",
+   "link_to": "F24 Payment",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Codici Tributo",
+   "link_to": "F24 Codice Tributo",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-05-19 12:23:57.930455",
+ "modified_by": "Administrator",
+ "module": "FAB",
+ "name": "F24",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "F24"
+}

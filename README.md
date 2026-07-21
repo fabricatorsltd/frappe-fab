@@ -1,18 +1,18 @@
-# FAB
+# fab
 
-Shared FAB workspace shell and common Desk integration for Frappe and ERPNext.
+Shared fabricators workspace shell and common Desk integration for Frappe and ERPNext.
 
 ## Scope
 
-`fab` is the thin app that gives the FAB suite a consistent home inside Desk. It
+`fab` is the thin app that gives the fabricators suite a consistent home inside Desk. It
 owns the shared workspace container, common branding, and the install-time
-synchronization that keeps FAB apps grouped together in the UI.
+synchronization that keeps fab apps grouped together in the UI.
 
 Current responsibilities include:
 
-- the top-level FAB desktop and sidebar entry points
+- the top-level fab desktop and sidebar entry points
 - shared labels, translations, and visual assets
-- install hooks that keep the FAB app group consistent across sites
+- install hooks that keep the fab app group consistent across sites
 
 ## Branches
 
@@ -27,7 +27,16 @@ bench get-app https://github.com/fabricatorsltd/frappe-fab.git --branch version-
 bench --site [site] install-app fab
 ```
 
-Use `--branch develop` when testing the FAB app set against Frappe `develop`.
+Use `--branch develop` when testing the fab app set against Frappe `develop`.
+
+## Contributing
+
+Follow the official Frappe contribution guidelines:
+
+- <https://github.com/frappe/erpnext/wiki/Contribution-Guidelines>
+
+In particular, align proposals, coding standards, pull request hygiene, and
+documentation updates with the upstream Frappe process.
 
 ## Development
 

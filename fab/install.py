@@ -39,6 +39,18 @@ FAB_CHILD_WORKSPACES = (
 		"old_name": "FAB OpenAPI",
 		"new_name": "OpenAPI",
 	},
+	{
+		"app": "fab_hr_italy",
+		"icon": "users",
+		"old_name": "HR Italy",
+		"new_name": "HR Italy",
+	},
+	{
+		"app": "fab_jethr_import",
+		"icon": "upload",
+		"old_name": "Jet HR Import",
+		"new_name": "Jet HR Import",
+	},
 )
 
 
@@ -331,7 +343,7 @@ def update_doc(doc, values: dict[str, object]):
 	if not changed:
 		return
 
-	if doc.is_new():
+	if doc.is_new() or not frappe.db.exists(doc.doctype, doc.name):
 		doc.insert(ignore_permissions=True)
 		return
 
