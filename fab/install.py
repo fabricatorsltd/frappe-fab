@@ -4,7 +4,11 @@ import json
 
 import frappe
 
-FAB_PARENT_ICON = "FAB"
+# The record name has to match the label exactly: get_desktop_icons() collects the
+# permitted parents by label but filters the children by parent_icon, which stores
+# the linked record's name. A child pointing at "FAB" would be dropped from a set
+# holding "fab", so the container would render without any of its apps.
+FAB_PARENT_ICON = "fab"
 FAB_PARENT_LABEL = "fab"
 FAB_PARENT_LOGO = "/assets/fab/images/fab-logo.png"
 FAB_MODULE = "FAB"
@@ -86,7 +90,32 @@ def sync_fab_desktop_group():
 		)
 
 
+def normalize_fab_parent_icon_case():
+	"""Lowercase the container icon and the links pointing at it.
+
+	Sites installed before the rename still hold a "FAB" record with "FAB" in
+	every child's parent_icon. The database collation is case insensitive, so the
+	links keep resolving and nothing looks broken, but get_desktop_icons() matches
+	those values against the parent label in Python and quietly drops every child.
+	"""
+	renamed = frappe.db.sql(
+		"""UPDATE `tabDesktop Icon` SET name = %s WHERE name = %s AND BINARY name != %s""",
+		(FAB_PARENT_ICON, FAB_PARENT_ICON, FAB_PARENT_ICON),
+	)
+
+	relinked = frappe.db.sql(
+		"""UPDATE `tabDesktop Icon` SET parent_icon = %s
+		WHERE parent_icon = %s AND BINARY parent_icon != %s""",
+		(FAB_PARENT_ICON, FAB_PARENT_ICON, FAB_PARENT_ICON),
+	)
+
+	if renamed or relinked:
+		frappe.clear_cache()
+
+
 def ensure_fab_parent_icon():
+	normalize_fab_parent_icon_case()
+
 	icon = get_or_create_doc(
 		"Desktop Icon",
 		FAB_PARENT_ICON,
