@@ -10,7 +10,13 @@ import frappe
 # holding "fab", so the container would render without any of its apps.
 FAB_PARENT_ICON = "fab"
 FAB_PARENT_LABEL = "fab"
-FAB_PARENT_LOGO = "/assets/fab/images/fab-logo.png"
+# Left empty on purpose. desktop_icon.html only tags the container with the
+# "folder-icon" class in the branch that runs when logo_url and icon_image are
+# both unset, and desktop.css hangs the folder background and the thumbnail grid
+# off that class. Setting a logo takes the earlier branch, so the container never
+# gets the class, render_folder_thumbnail() clears the logo it just rendered, and
+# the tile ends up blank. ERPNext's own folders leave this empty for the same reason.
+FAB_PARENT_LOGO = None
 FAB_MODULE = "FAB"
 FAB_CHILD_WORKSPACES = (
 	{
