@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import frappe
+from frappe.utils import cint, cstr, flt
 
 
 DEFAULT_BUNDLE_CANDIDATES = (
@@ -101,6 +102,74 @@ def ensure_price_neutral_import_settings() -> None:
 	"""
 	frappe.db.set_single_value("Stock Settings", "auto_insert_price_list_rate_if_missing", 0)
 	frappe.db.set_single_value("Buying Settings", "disable_last_purchase_rate", 1)
+
+
+def verify_import_against_bundle(bundle_path: str | None = None) -> dict[str, Any]:
+	"""Compare every imported document against the bundle headers.
+
+	The Odoo headers are the booked truth: any drift on grand total or untaxed
+	total flags the document for rebuild_mismatched_documents.
+	"""
+	bundle = load_invoice_bundle(bundle_path)
+	report: dict[str, Any] = {"exact": 0, "mismatched": [], "missing": [], "draft": []}
+	for doctype, moves in (
+		("Sales Invoice", bundle.get(CUSTOMER_BUNDLE_KEY, [])),
+		("Purchase Invoice", bundle.get(SUPPLIER_BUNDLE_KEY, [])),
+	):
+		for move in moves:
+			number = get_target_document_name(move=move, doctype=doctype)
+			if not number or not frappe.db.exists(doctype, number):
+				report["missing"].append((doctype, number))
+				continue
+			docstatus, grand_total, net_total = frappe.db.get_value(
+				doctype, number, ["docstatus", "grand_total", "net_total"]
+			)
+			if docstatus != 1:
+				report["draft"].append((doctype, number))
+				continue
+			sign = -1 if is_return_move(move) else 1
+			expected_total = sign * round(abs(flt(move.get("total_amount"))), 2)
+			expected_net = sign * round(abs(flt(move.get("untaxed_amount"))), 2)
+			if abs(flt(grand_total) - expected_total) <= 0.005 and abs(flt(net_total) - expected_net) <= 0.005:
+				report["exact"] += 1
+			else:
+				report["mismatched"].append(
+					(doctype, number, expected_total, flt(grand_total), expected_net, flt(net_total))
+				)
+	return report
+
+
+def rebuild_mismatched_documents(
+	bundle_path: str | None = None,
+	company: str | None = None,
+) -> dict[str, Any]:
+	"""Drop every drifted document and let the idempotent import recreate it."""
+	report = verify_import_against_bundle(bundle_path)
+	for entry in report["mismatched"]:
+		delete_imported_document(doctype=entry[0], name=entry[1])
+	frappe.db.commit()
+	results = import_odoo_invoice_bundle(bundle_path=bundle_path, company=company)
+	results["rebuilt"] = [entry[1] for entry in report["mismatched"]]
+	return results
+
+
+def delete_imported_document(doctype: str, name: str) -> None:
+	"""Remove an imported invoice together with its settlement journal entries."""
+	journal_names = frappe.get_all(
+		"Journal Entry Account",
+		filters={"reference_type": doctype, "reference_name": name},
+		pluck="parent",
+		distinct=True,
+	)
+	for journal_name in set(journal_names):
+		journal = frappe.get_doc("Journal Entry", journal_name)
+		if journal.docstatus == 1:
+			journal.cancel()
+		frappe.delete_doc("Journal Entry", journal_name, force=1, ignore_permissions=True)
+	doc = frappe.get_doc(doctype, name)
+	if doc.docstatus == 1:
+		doc.cancel()
+	frappe.delete_doc(doctype, name, force=1, ignore_permissions=True)
 
 
 def load_invoice_bundle(bundle_path: str | None) -> dict[str, Any]:
