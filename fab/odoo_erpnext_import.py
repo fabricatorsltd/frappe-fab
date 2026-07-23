@@ -42,6 +42,7 @@ class ERPNextImportSettings:
 	cost_center: str
 	sales_mode_of_payment: str
 	temp_italy_state_code: str = "RM"
+	clearing_account: str = "Odoo Migration Clearing"
 
 
 def import_odoo_invoice_bundle(
@@ -50,8 +51,11 @@ def import_odoo_invoice_bundle(
 	customer_limit: int | None = None,
 	supplier_limit: int | None = None,
 	commit_every: int = 25,
+	clearing_account: str | None = None,
 ) -> dict[str, Any]:
 	settings = resolve_import_settings(company=company)
+	if clearing_account:
+		settings.clearing_account = clearing_account
 	ensure_price_neutral_import_settings()
 	resolved_bundle_path = resolve_bundle_path(bundle_path)
 	bundle = json.loads(resolved_bundle_path.read_text())
@@ -142,13 +146,16 @@ def verify_import_against_bundle(bundle_path: str | None = None) -> dict[str, An
 def rebuild_mismatched_documents(
 	bundle_path: str | None = None,
 	company: str | None = None,
+	clearing_account: str | None = None,
 ) -> dict[str, Any]:
 	"""Drop every drifted document and let the idempotent import recreate it."""
 	report = verify_import_against_bundle(bundle_path)
 	for entry in report["mismatched"]:
 		delete_imported_document(doctype=entry[0], name=entry[1])
 	frappe.db.commit()
-	results = import_odoo_invoice_bundle(bundle_path=bundle_path, company=company)
+	results = import_odoo_invoice_bundle(
+		bundle_path=bundle_path, company=company, clearing_account=clearing_account
+	)
 	results["rebuilt"] = [entry[1] for entry in report["mismatched"]]
 	return results
 
@@ -291,6 +298,7 @@ def import_move(
 			items=item_rows,
 			taxes=tax_rows,
 			settings=settings,
+			results=results,
 		)
 	)
 	doc.insert(ignore_permissions=True)
@@ -479,7 +487,10 @@ def get_net_rounding_gap(
 	target = abs(header_net) + discount_total
 	actual = sum(abs(round(round(flt(row["rate"]), 2) * flt(row["qty"]), 2)) for row in items)
 	gap = round(actual - target, 2)
-	if abs(gap) > 0.05:
+	# rates are stored at currency precision, so each quantity unit can move
+	# the row total by up to half a cent: scale the guard with the quantity
+	tolerance = 0.05 + 0.005 * sum(abs(flt(row["qty"])) for row in items)
+	if abs(gap) > tolerance:
 		return 0.0
 	return gap
 
@@ -545,6 +556,7 @@ def build_invoice_payload(
 	items: list[dict[str, Any]],
 	taxes: list[dict[str, Any]],
 	settings: ERPNextImportSettings,
+	results: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
 	due_date = get_effective_due_date(move)
 	payload = {
@@ -563,7 +575,12 @@ def build_invoice_payload(
 		"taxes": taxes,
 	}
 	_, discount_total = partition_move_lines(move)
-	discount_total += get_net_rounding_gap(move=move, items=items, discount_total=discount_total)
+	rounding_gap = get_net_rounding_gap(move=move, items=items, discount_total=discount_total)
+	if results is not None and abs(rounding_gap) > 0.05:
+		results["warnings"].append(
+			f"{doctype} {move.get('odoo_number')}: net rounding gap {rounding_gap:.2f} folded into discount"
+		)
+	discount_total += rounding_gap
 	if discount_total:
 		# negative on returns: the discount must shrink the absolute value of an
 		# already negative net total
@@ -731,7 +748,22 @@ def get_tax_account_for_label(
 	return settings.purchase_tax_account
 
 
+NATURA_EXEMPTION_REASONS = {
+	"1": "N1-Escluse ex art. 15",
+	"2": "N2-Non Soggette",
+	"3": "N3-Non Imponibili",
+	"4": "N4-Esenti",
+	"5": "N5-Regime del margine / IVA non esposta in fattura",
+	"6": "N6-Inversione Contabile",
+	"7": "N7-IVA assolta in altro stato UE",
+}
+
+
 def get_tax_exemption_reason(tax_label: str) -> str:
+	# explicit FatturaPA nature code in the label wins over the heuristics
+	natura = re.search(r"\bN([1-7])(?:\.\d+)?\b", tax_label)
+	if natura:
+		return NATURA_EXEMPTION_REASONS[natura.group(1)]
 	label = tax_label.lower()
 	if "art.7 ter" in label or "non soggetta" in label:
 		return "N2-Non Soggette"
@@ -837,7 +869,6 @@ def finalize_imported_document(
 		close_settled_invoice(doc=doc, move=move, settings=settings, results=results)
 
 
-MIGRATION_CLEARING_ACCOUNT = "Odoo Migration Clearing"
 SETTLED_PAYMENT_STATES = ("paid", "in_payment")
 
 
@@ -883,7 +914,7 @@ def close_settled_invoice(doc, move: dict[str, Any], settings: ERPNextImportSett
 			"doctype": "Journal Entry",
 			"company": settings.company,
 			"posting_date": doc.posting_date,
-			"user_remark": f"Odoo migration settlement for {doc.doctype} {doc.name}",
+			"user_remark": f"Migration settlement for {doc.doctype} {doc.name}",
 			"accounts": [party_row, clearing_row],
 		}
 	)
@@ -895,7 +926,7 @@ def close_settled_invoice(doc, move: dict[str, Any], settings: ERPNextImportSett
 
 def ensure_migration_clearing_account(settings: ERPNextImportSettings) -> str:
 	existing = frappe.db.get_value(
-		"Account", {"company": settings.company, "account_name": MIGRATION_CLEARING_ACCOUNT}, "name"
+		"Account", {"company": settings.company, "account_name": settings.clearing_account}, "name"
 	)
 	if existing:
 		return existing
@@ -909,7 +940,7 @@ def ensure_migration_clearing_account(settings: ERPNextImportSettings) -> str:
 		{
 			"doctype": "Account",
 			"company": settings.company,
-			"account_name": MIGRATION_CLEARING_ACCOUNT,
+			"account_name": settings.clearing_account,
 			"parent_account": parent,
 			"root_type": "Asset",
 			"is_group": 0,
