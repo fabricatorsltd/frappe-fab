@@ -1,0 +1,22 @@
+{
+ "app": "fab",
+ "bg_color": "gray",
+ "creation": "2026-07-23 10:54:15.232324",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "change",
+ "icon_type": "Link",
+ "idx": 0,
+ "label": "Exchange Rate Sync",
+ "link_to": "Exchange Rate Sync",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-07-23 10:59:01.430463",
+ "modified_by": "Administrator",
+ "name": "Exchange Rate Sync",
+ "owner": "Administrator",
+ "parent_icon": "fab",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}

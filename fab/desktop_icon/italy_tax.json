@@ -1,0 +1,22 @@
+{
+ "app": "fab",
+ "bg_color": "gray",
+ "creation": "2026-07-23 10:54:15.389299",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "balance-scale",
+ "icon_type": "Link",
+ "idx": 0,
+ "label": "Italy Tax",
+ "link_to": "Italy Tax",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-07-23 10:59:01.541090",
+ "modified_by": "Administrator",
+ "name": "Italy Tax",
+ "owner": "Administrator",
+ "parent_icon": "fab",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}

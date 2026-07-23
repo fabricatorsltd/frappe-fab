@@ -1,0 +1,22 @@
+{
+ "app": "fab",
+ "bg_color": "gray",
+ "creation": "2026-07-23 10:54:15.310552",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "file",
+ "icon_type": "Link",
+ "idx": 0,
+ "label": "Italy E-Invoicing",
+ "link_to": "Italy E-Invoicing",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-07-23 10:59:01.485307",
+ "modified_by": "Administrator",
+ "name": "Italy E-Invoicing",
+ "owner": "Administrator",
+ "parent_icon": "fab",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}
