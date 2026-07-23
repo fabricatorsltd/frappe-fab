@@ -123,22 +123,22 @@ def resolve_import_settings(company: str | None = None) -> ERPNextImportSettings
 		stock_uom=ensure_import_uom(),
 		sales_income_account=pick_existing(
 			"Account",
-			["4110 - Sales - fab", "4120 - Service - fab"],
+			[company_doc.default_income_account, "4110 - Sales - fab", "4120 - Service - fab"],
 			filters={"company": company_doc.name, "root_type": "Income", "is_group": 0},
 		),
 		service_income_account=pick_existing(
 			"Account",
-			["4120 - Service - fab", "4110 - Sales - fab"],
+			[company_doc.default_income_account, "4120 - Service - fab", "4110 - Sales - fab"],
 			filters={"company": company_doc.name, "root_type": "Income", "is_group": 0},
 		),
 		purchase_expense_account=pick_existing(
 			"Account",
-			["5201 - Administrative Expenses - fab", "5223 - Miscellaneous Expenses - fab"],
+			[company_doc.default_expense_account, "5201 - Administrative Expenses - fab"],
 			filters={"company": company_doc.name, "root_type": "Expense", "is_group": 0},
 		),
 		purchase_surcharge_account=pick_existing(
 			"Account",
-			["5201 - Administrative Expenses - fab", "5223 - Miscellaneous Expenses - fab"],
+			[company_doc.default_expense_account, "5201 - Administrative Expenses - fab"],
 			filters={"company": company_doc.name, "root_type": "Expense", "is_group": 0},
 		),
 		receivable_account=company_doc.default_receivable_account,
@@ -641,16 +641,30 @@ def finalize_imported_document(
 	status_bucket: dict[str, int],
 ) -> None:
 	source_state = cstr(move.get("state")).lower()
+	submitted = False
 	if source_state == "posted" and doc.docstatus == 0:
 		apply_sales_payment_schedule_defaults(doc=doc, move=move, settings=settings)
-		doc.submit()
-		increment(status_bucket, "submitted")
+		frappe.db.savepoint("before_submit")
+		try:
+			doc.submit()
+			submitted = True
+			increment(status_bucket, "submitted")
+		except frappe.ValidationError as exc:
+			# one document failing a regional check (e.g. a party with no tax id)
+			# must not abort the whole run; keep it as a draft to fix by hand
+			frappe.db.rollback(save_point="before_submit")
+			doc.reload()
+			results["warnings"].append(
+				f"{doc.doctype} {doc.name} ({move.get('odoo_number')}): left as draft, {exc}"
+			)
+			increment(status_bucket, "draft")
 	elif source_state == "cancel" and doc.docstatus == 0:
 		results["warnings"].append(
 			f"{doc.doctype} {doc.name}: source state is cancelled; imported as draft to avoid GL reversal locking."
 		)
 	validate_import_totals(move=move, doc=doc, results=results)
-	close_settled_invoice(doc=doc, move=move, settings=settings, results=results)
+	if submitted:
+		close_settled_invoice(doc=doc, move=move, settings=settings, results=results)
 
 
 MIGRATION_CLEARING_ACCOUNT = "Odoo Migration Clearing"
@@ -841,9 +855,13 @@ def sanitize_code_fragment(value: str | None) -> str:
 
 def pick_existing(doctype: str, candidates: list[str], filters: dict[str, Any] | None = None) -> str:
 	for candidate in candidates:
-		if frappe.db.exists(doctype, candidate):
+		if candidate and frappe.db.exists(doctype, candidate):
 			return candidate
-	rows = frappe.get_all(doctype, filters=filters or {}, pluck="name", limit_page_length=1)
+	query_filters = dict(filters or {})
+	# never fall back to a disabled account: posting against one is rejected
+	if doctype == "Account" and "disabled" not in query_filters:
+		query_filters["disabled"] = 0
+	rows = frappe.get_all(doctype, filters=query_filters, pluck="name", limit_page_length=1)
 	if not rows:
 		raise ValueError(f"Missing required setup records for {doctype}.")
 	return rows[0]
