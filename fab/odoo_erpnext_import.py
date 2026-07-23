@@ -73,13 +73,13 @@ def import_odoo_invoice_bundle(
 
 	processed = 0
 	for move in customer_moves:
-		import_move(move=move, doctype="Sales Invoice", settings=settings, results=results)
+		import_move_safely(move=move, doctype="Sales Invoice", settings=settings, results=results)
 		processed += 1
 		if processed % commit_every == 0:
 			frappe.db.commit()
 
 	for move in supplier_moves:
-		import_move(move=move, doctype="Purchase Invoice", settings=settings, results=results)
+		import_move_safely(move=move, doctype="Purchase Invoice", settings=settings, results=results)
 		processed += 1
 		if processed % commit_every == 0:
 			frappe.db.commit()
@@ -149,6 +149,31 @@ def resolve_import_settings(company: str | None = None) -> ERPNextImportSettings
 		sales_mode_of_payment=pick_existing_mode_of_payment(),
 		temp_italy_state_code=get_temp_italy_state_code(),
 	)
+
+
+def import_move_safely(
+	move: dict[str, Any],
+	doctype: str,
+	settings: ERPNextImportSettings,
+	results: dict[str, Any],
+) -> None:
+	"""Import one document, isolating failures so the run continues.
+
+	Some source documents cannot be created at all (e.g. a party with no tax id
+	fails the regional validate on insert). Rolling back to a per document
+	savepoint drops that document cleanly and records it, instead of aborting
+	the whole migration.
+	"""
+	frappe.db.savepoint("before_move")
+	try:
+		import_move(move=move, doctype=doctype, settings=settings, results=results)
+	except Exception as exc:
+		frappe.db.rollback(save_point="before_move")
+		bucket = results["sales_invoices" if doctype == "Sales Invoice" else "purchase_invoices"]
+		increment(bucket, "skipped")
+		results["warnings"].append(
+			f"{doctype} {move.get('odoo_number')}: skipped, {str(exc)[:200]}"
+		)
 
 
 def import_move(
@@ -293,6 +318,26 @@ def get_unique_party_name(doctype: str, party_name: str, tax_id: str, partner_id
 	return frappe.generate_hash(length=10)
 
 
+def partition_move_lines(move: dict[str, Any]) -> tuple[list[dict[str, Any]], float]:
+	"""Split source lines into item lines and a document level discount.
+
+	Odoo books some discounts as negative lines ("Bonus", promo credits).
+	ERPNext refuses negative rates, so those lines are folded into a single
+	invoice discount on net total. Lines whose sign opposes the document sign
+	are the discounts; on credit notes the roles are inverted, since the
+	exporter flips every line.
+	"""
+	doc_sign = -1.0 if is_return_move(move) else 1.0
+	item_lines: list[dict[str, Any]] = []
+	discount_total = 0.0
+	for line in move.get("lines") or []:
+		if flt(line.get("subtotal")) * doc_sign < 0:
+			discount_total += abs(flt(line.get("subtotal")))
+		else:
+			item_lines.append(line)
+	return item_lines, discount_total
+
+
 def build_item_rows(
 	move: dict[str, Any],
 	doctype: str,
@@ -301,9 +346,12 @@ def build_item_rows(
 ) -> list[dict[str, Any]]:
 	rows = []
 	is_return = is_return_move(move)
-	for line in move.get("lines") or []:
+	item_lines, _ = partition_move_lines(move)
+	for line in item_lines:
 		item_code = ensure_item_for_line(line=line, doctype=doctype, settings=settings, results=results)
 		item_name = get_item_display_name(line=line, fallback=item_code)
+		unit_price = abs(flt(line.get("unit_price"))) if is_return else flt(line.get("unit_price"))
+		discount = flt(line.get("discount"))
 		common = {
 			"item_code": item_code,
 			"item_name": item_name,
@@ -311,8 +359,11 @@ def build_item_rows(
 			"qty": (-1 if is_return else 1) * abs(flt(line.get("quantity")) or 1.0),
 			"uom": settings.stock_uom,
 			"conversion_factor": 1,
-			"rate": abs(flt(line.get("unit_price"))) if is_return else flt(line.get("unit_price")),
-			"discount_percentage": flt(line.get("discount")),
+			# without a price list rate ERPNext ignores discount_percentage and
+			# keeps the full price, which inflated every discounted line
+			"price_list_rate": unit_price,
+			"rate": unit_price * (1 - discount / 100.0),
+			"discount_percentage": discount,
 			"cost_center": settings.cost_center,
 		}
 		if doctype == "Sales Invoice":
@@ -402,6 +453,12 @@ def build_invoice_payload(
 		"items": items,
 		"taxes": taxes,
 	}
+	_, discount_total = partition_move_lines(move)
+	if discount_total:
+		# negative on returns: the discount must shrink the absolute value of an
+		# already negative net total
+		payload["apply_discount_on"] = "Net Total"
+		payload["discount_amount"] = (-1 if payload["is_return"] else 1) * discount_total
 	if doctype == "Sales Invoice":
 		payload.update(
 			{

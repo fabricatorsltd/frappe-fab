@@ -13,6 +13,7 @@ from fab.odoo_erpnext_import import (
 	get_address_state_values,
 	get_target_document_name,
 	is_return_move,
+	partition_move_lines,
 	sanitize_code_fragment,
 )
 
@@ -246,4 +247,28 @@ class TestCloseSettledInvoice(unittest.TestCase):
 	def test_skips_zero_outstanding(self):
 		frappe_mock, entry, results = self.run_close(self.make_doc(outstanding=0.0))
 		frappe_mock.get_doc.assert_not_called()
+
+class TestPartitionMoveLines(unittest.TestCase):
+	def test_folds_negative_lines_into_discount(self):
+		move = {"lines": [
+			{"subtotal": 11.22}, {"subtotal": 0.0},
+			{"subtotal": -1.61}, {"subtotal": -1.61}, {"subtotal": -1.61},
+		]}
+		items, discount = partition_move_lines(move)
+		self.assertEqual(len(items), 2)
+		self.assertAlmostEqual(discount, 4.83)
+
+	def test_keeps_all_lines_when_no_discounts(self):
+		move = {"lines": [{"subtotal": 100.0}, {"subtotal": 50.0}]}
+		items, discount = partition_move_lines(move)
+		self.assertEqual(len(items), 2)
+		self.assertEqual(discount, 0.0)
+
+	def test_inverts_roles_on_credit_notes(self):
+		# exporter flips every refund line, so real lines are negative and the
+		# original discount lines come out positive
+		move = {"lines": [{"subtotal": -100.0}, {"subtotal": -50.0}, {"subtotal": 10.0}]}
+		items, discount = partition_move_lines(move)
+		self.assertEqual(len(items), 2)
+		self.assertAlmostEqual(discount, 10.0)
 
