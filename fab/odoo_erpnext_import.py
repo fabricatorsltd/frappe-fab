@@ -650,6 +650,90 @@ def finalize_imported_document(
 			f"{doc.doctype} {doc.name}: source state is cancelled; imported as draft to avoid GL reversal locking."
 		)
 	validate_import_totals(move=move, doc=doc, results=results)
+	close_settled_invoice(doc=doc, move=move, settings=settings, results=results)
+
+
+MIGRATION_CLEARING_ACCOUNT = "Odoo Migration Clearing"
+SETTLED_PAYMENT_STATES = ("paid", "in_payment")
+
+
+def close_settled_invoice(doc, move: dict[str, Any], settings: ERPNextImportSettings, results: dict[str, Any]) -> None:
+	"""Clear the open balance of invoices Odoo reports as settled.
+
+	Source payments are not migrated, so without this every historical invoice
+	would sit in the ageing report as receivable or payable. The offset goes to
+	a dedicated clearing account: its balance shows the migration adjustment at
+	a glance and keeps real bank accounts out of it.
+	"""
+	if doc.docstatus != 1:
+		return
+	if cstr(move.get("payment_state")).lower() not in SETTLED_PAYMENT_STATES:
+		return
+	outstanding = flt(doc.outstanding_amount)
+	if not outstanding:
+		return
+
+	clearing_account = ensure_migration_clearing_account(settings)
+	is_sales = doc.doctype == "Sales Invoice"
+	party_account = doc.debit_to if is_sales else doc.credit_to
+	party_type = "Customer" if is_sales else "Supplier"
+	party = doc.customer if is_sales else doc.supplier
+	party_row: dict[str, Any] = {
+		"account": party_account,
+		"party_type": party_type,
+		"party": party,
+		"reference_type": doc.doctype,
+		"reference_name": doc.name,
+		"cost_center": settings.cost_center,
+	}
+	clearing_row: dict[str, Any] = {"account": clearing_account, "cost_center": settings.cost_center}
+	if (is_sales and outstanding > 0) or (not is_sales and outstanding < 0):
+		party_row["credit_in_account_currency"] = abs(outstanding)
+		clearing_row["debit_in_account_currency"] = abs(outstanding)
+	else:
+		party_row["debit_in_account_currency"] = abs(outstanding)
+		clearing_row["credit_in_account_currency"] = abs(outstanding)
+
+	entry = frappe.get_doc(
+		{
+			"doctype": "Journal Entry",
+			"company": settings.company,
+			"posting_date": doc.posting_date,
+			"user_remark": f"Odoo migration settlement for {doc.doctype} {doc.name}",
+			"accounts": [party_row, clearing_row],
+		}
+	)
+	entry.flags.ignore_permissions = True
+	entry.insert()
+	entry.submit()
+	increment(results.setdefault("closures", {}), "settled")
+
+
+def ensure_migration_clearing_account(settings: ERPNextImportSettings) -> str:
+	existing = frappe.db.get_value(
+		"Account", {"company": settings.company, "account_name": MIGRATION_CLEARING_ACCOUNT}, "name"
+	)
+	if existing:
+		return existing
+
+	parent = frappe.db.get_value(
+		"Account",
+		{"company": settings.company, "root_type": "Asset", "is_group": 1, "parent_account": ["in", ["", None]]},
+		"name",
+	)
+	doc = frappe.get_doc(
+		{
+			"doctype": "Account",
+			"company": settings.company,
+			"account_name": MIGRATION_CLEARING_ACCOUNT,
+			"parent_account": parent,
+			"root_type": "Asset",
+			"is_group": 0,
+		}
+	)
+	doc.flags.ignore_permissions = True
+	doc.insert()
+	return doc.name
 
 
 def reset_invoice_series_counters() -> None:

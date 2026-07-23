@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
+import fab.odoo_erpnext_import as odoo_erpnext_import
 from fab.odoo_erpnext_import import (
 	ERPNextImportSettings,
 	build_item_code,
@@ -183,3 +186,64 @@ class TestOdooERPNextImport(unittest.TestCase):
 
 		self.assertEqual(state, "MI")
 		self.assertEqual(state_code, "MI")
+
+class TestCloseSettledInvoice(unittest.TestCase):
+	def make_doc(self, doctype="Sales Invoice", outstanding=122.0, docstatus=1):
+		return SimpleNamespace(
+			doctype=doctype,
+			name="FATT/2025/00001",
+			docstatus=docstatus,
+			outstanding_amount=outstanding,
+			posting_date="2025-03-01",
+			debit_to="150100 - Customer receivables - FI",
+			credit_to="250100 - Accounts payable - FI",
+			customer="ACME",
+			supplier="ACME Supplies",
+		)
+
+	def make_settings(self):
+		return SimpleNamespace(company="FABRICATORS S.R.L.", cost_center="Main - FI")
+
+	def run_close(self, doc, payment_state="paid"):
+		with patch.object(odoo_erpnext_import, "frappe") as frappe_mock, patch.object(
+			odoo_erpnext_import, "ensure_migration_clearing_account", return_value="Odoo Migration Clearing - FI"
+		):
+			entry = MagicMock()
+			frappe_mock.get_doc.return_value = entry
+			results = {}
+			odoo_erpnext_import.close_settled_invoice(
+				doc=doc, move={"payment_state": payment_state}, settings=self.make_settings(), results=results
+			)
+			return frappe_mock, entry, results
+
+	def test_skips_unsubmitted_documents(self):
+		frappe_mock, entry, results = self.run_close(self.make_doc(docstatus=0))
+		frappe_mock.get_doc.assert_not_called()
+
+	def test_skips_open_payment_states(self):
+		frappe_mock, entry, results = self.run_close(self.make_doc(), payment_state="not_paid")
+		frappe_mock.get_doc.assert_not_called()
+
+	def test_sales_invoice_credits_the_customer(self):
+		frappe_mock, entry, results = self.run_close(self.make_doc())
+		payload = frappe_mock.get_doc.call_args[0][0]
+		party_row, clearing_row = payload["accounts"]
+		self.assertEqual(party_row["credit_in_account_currency"], 122.0)
+		self.assertEqual(party_row["reference_name"], "FATT/2025/00001")
+		self.assertEqual(clearing_row["debit_in_account_currency"], 122.0)
+		entry.submit.assert_called_once()
+		self.assertEqual(results["closures"]["settled"], 1)
+
+	def test_purchase_invoice_debits_the_supplier(self):
+		doc = self.make_doc(doctype="Purchase Invoice", outstanding=80.0)
+		frappe_mock, entry, results = self.run_close(doc)
+		payload = frappe_mock.get_doc.call_args[0][0]
+		party_row, clearing_row = payload["accounts"]
+		self.assertEqual(party_row["debit_in_account_currency"], 80.0)
+		self.assertEqual(party_row["party_type"], "Supplier")
+		self.assertEqual(clearing_row["credit_in_account_currency"], 80.0)
+
+	def test_skips_zero_outstanding(self):
+		frappe_mock, entry, results = self.run_close(self.make_doc(outstanding=0.0))
+		frappe_mock.get_doc.assert_not_called()
+

@@ -152,3 +152,39 @@ class TestOdooImport(unittest.TestCase):
 			self.assertEqual(loaded["customer_invoices"][0]["odoo_number"], "FATT/2025/00001")
 			lines = flatten_move_lines(bundle["customer_invoices"])
 			self.assertEqual(lines[0]["tax_names"], "22%")
+
+	def test_build_move_domain_filters_company(self):
+		self.assertEqual(
+			build_move_domain("out_invoice", "2025-01-01", posted_only=True, company_id=1),
+			[
+				["move_type", "=", "out_invoice"],
+				["invoice_date", ">=", "2025-01-01"],
+				["state", "=", "posted"],
+				["company_id", "=", 1],
+			],
+		)
+
+	def test_normalize_move_negates_refund_line_totals(self):
+		move = {
+			"id": 9,
+			"name": "NDC/2025/00001",
+			"invoice_line_ids": [1],
+			"partner_id": [5, "ACME"],
+		}
+		lines = {1: {"id": 1, "display_type": "product", "name": "Refunded work", "quantity": 1.0, "price_unit": 100.0, "price_subtotal": 100.0, "price_total": 122.0, "tax_ids": []}}
+		normalized = normalize_move(move=move, move_type="out_refund", line_lookup=lines, product_lookup={}, partner_lookup={}, tax_lookup={})
+		self.assertEqual(normalized["lines"][0]["subtotal"], -100.0)
+		self.assertEqual(normalized["lines"][0]["total"], -122.0)
+
+	def test_normalize_move_keeps_invoice_line_totals_positive(self):
+		move = {
+			"id": 10,
+			"name": "FATT/2025/00001",
+			"invoice_line_ids": [1],
+			"partner_id": [5, "ACME"],
+		}
+		lines = {1: {"id": 1, "display_type": "product", "name": "Work", "quantity": 1.0, "price_unit": 100.0, "price_subtotal": 100.0, "price_total": 122.0, "tax_ids": []}}
+		normalized = normalize_move(move=move, move_type="out_invoice", line_lookup=lines, product_lookup={}, partner_lookup={}, tax_lookup={})
+		self.assertEqual(normalized["lines"][0]["subtotal"], 100.0)
+		self.assertEqual(normalized["lines"][0]["total"], 122.0)
+

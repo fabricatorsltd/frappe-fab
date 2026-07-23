@@ -10,7 +10,9 @@ from typing import Any
 
 DEFAULT_DATE_FROM = "2025-01-01"
 CUSTOMER_MOVE_TYPE = "out_invoice"
+CUSTOMER_REFUND_TYPE = "out_refund"
 SUPPLIER_MOVE_TYPE = "in_invoice"
+SUPPLIER_REFUND_TYPE = "in_refund"
 MOVE_BATCH_SIZE = 200
 
 MOVE_FIELDS = [
@@ -174,6 +176,7 @@ def export_odoo_invoice_bundle(
 	output_dir: str,
 	date_from: str = DEFAULT_DATE_FROM,
 	verify_ssl: bool = True,
+	company_id: int | None = None,
 ) -> dict[str, Any]:
 	client = OdooClient(
 		OdooConnectionConfig(
@@ -189,19 +192,40 @@ def export_odoo_invoice_bundle(
 		move_type=CUSTOMER_MOVE_TYPE,
 		date_from=date_from,
 		posted_only=True,
+		company_id=company_id,
+	) + fetch_invoice_documents(
+		client=client,
+		move_type=CUSTOMER_REFUND_TYPE,
+		date_from=date_from,
+		posted_only=True,
+		company_id=company_id,
 	)
 	supplier_invoices = fetch_invoice_documents(
 		client=client,
 		move_type=SUPPLIER_MOVE_TYPE,
 		date_from=date_from,
-		posted_only=False,
+		posted_only=True,
+		company_id=company_id,
+	) + fetch_invoice_documents(
+		client=client,
+		move_type=SUPPLIER_REFUND_TYPE,
+		date_from=date_from,
+		posted_only=True,
+		company_id=company_id,
 	)
 
 	bundle = {
 		"date_from": date_from,
 		"filters": {
-			"customer_invoices": {"move_type": CUSTOMER_MOVE_TYPE, "state": "posted"},
-			"supplier_invoices": {"move_type": SUPPLIER_MOVE_TYPE, "state": "any"},
+			"company_id": company_id,
+			"customer_invoices": {
+				"move_types": [CUSTOMER_MOVE_TYPE, CUSTOMER_REFUND_TYPE],
+				"state": "posted",
+			},
+			"supplier_invoices": {
+				"move_types": [SUPPLIER_MOVE_TYPE, SUPPLIER_REFUND_TYPE],
+				"state": "posted",
+			},
 		},
 		"customer_invoices": customer_invoices,
 		"supplier_invoices": supplier_invoices,
@@ -214,10 +238,13 @@ def fetch_invoice_documents(
 	move_type: str,
 	date_from: str,
 	posted_only: bool,
+	company_id: int | None = None,
 ) -> list[dict[str, Any]]:
 	moves = client.search_read(
 		"account.move",
-		build_move_domain(move_type=move_type, date_from=date_from, posted_only=posted_only),
+		build_move_domain(
+			move_type=move_type, date_from=date_from, posted_only=posted_only, company_id=company_id
+		),
 		fields=MOVE_FIELDS,
 		order="invoice_date asc, id asc",
 	)
@@ -250,13 +277,17 @@ def fetch_invoice_documents(
 	]
 
 
-def build_move_domain(move_type: str, date_from: str, posted_only: bool) -> list[list[Any]]:
+def build_move_domain(
+	move_type: str, date_from: str, posted_only: bool, company_id: int | None = None
+) -> list[list[Any]]:
 	domain: list[list[Any]] = [
 		["move_type", "=", move_type],
 		["invoice_date", ">=", date_from],
 	]
 	if posted_only:
 		domain.append(["state", "=", "posted"])
+	if company_id is not None:
+		domain.append(["company_id", "=", company_id])
 	return domain
 
 
@@ -270,6 +301,9 @@ def normalize_move(
 ) -> dict[str, Any]:
 	partner_id = value_id(move.get("partner_id"))
 	partner = partner_lookup.get(partner_id, {})
+	# refund lines carry positive amounts in Odoo; the importer detects credit
+	# notes from negative line totals, so flip the sign here
+	line_sign = -1.0 if move_type.endswith("_refund") else 1.0
 	lines = []
 	for line_id in move.get("invoice_line_ids") or []:
 		line = line_lookup.get(line_id)
@@ -291,8 +325,8 @@ def normalize_move(
 				"discount": line.get("discount") or 0.0,
 				"tax_ids": line_tax_ids,
 				"tax_names": [tax_lookup.get(tax_id, {}).get("name") or str(tax_id) for tax_id in line_tax_ids],
-				"subtotal": line.get("price_subtotal") or 0.0,
-				"total": line.get("price_total") or 0.0,
+				"subtotal": line_sign * (line.get("price_subtotal") or 0.0),
+				"total": line_sign * (line.get("price_total") or 0.0),
 			}
 		)
 
