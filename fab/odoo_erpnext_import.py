@@ -51,6 +51,7 @@ def import_odoo_invoice_bundle(
 	commit_every: int = 25,
 ) -> dict[str, Any]:
 	settings = resolve_import_settings(company=company)
+	ensure_price_neutral_import_settings()
 	resolved_bundle_path = resolve_bundle_path(bundle_path)
 	bundle = json.loads(resolved_bundle_path.read_text())
 	results = {
@@ -88,6 +89,18 @@ def import_odoo_invoice_bundle(
 	frappe.db.commit()
 	frappe.clear_cache()
 	return results
+
+
+def ensure_price_neutral_import_settings() -> None:
+	"""Keep ERPNext price automation away from imported rates.
+
+	Imported lines are historical facts: without these switches ERPNext creates
+	an Item Price from every invoice line and refills zero rates from the item
+	price list or last purchase rate, silently inflating documents that carry
+	unbilled or note lines.
+	"""
+	frappe.db.set_single_value("Stock Settings", "auto_insert_price_list_rate_if_missing", 0)
+	frappe.db.set_single_value("Buying Settings", "disable_last_purchase_rate", 1)
 
 
 def load_invoice_bundle(bundle_path: str | None) -> dict[str, Any]:
@@ -350,20 +363,25 @@ def build_item_rows(
 	for line in item_lines:
 		item_code = ensure_item_for_line(line=line, doctype=doctype, settings=settings, results=results)
 		item_name = get_item_display_name(line=line, fallback=item_code)
-		unit_price = abs(flt(line.get("unit_price"))) if is_return else flt(line.get("unit_price"))
-		discount = flt(line.get("discount"))
+		qty = abs(flt(line.get("quantity")))
+		subtotal = abs(flt(line.get("subtotal")))
+		if qty:
+			# subtotal is already net of the source discount, so deriving the
+			# rate from it reproduces the billed amount exactly
+			rate = subtotal / qty
+		else:
+			# zero quantity lines are notes or unbilled options: keep the text,
+			# bill nothing even if the source kept a unit price on them
+			qty = 1.0
+			rate = subtotal
 		common = {
 			"item_code": item_code,
 			"item_name": item_name,
 			"description": line.get("description") or line.get("product_name") or item_name,
-			"qty": (-1 if is_return else 1) * abs(flt(line.get("quantity")) or 1.0),
+			"qty": (-1 if is_return else 1) * qty,
 			"uom": settings.stock_uom,
 			"conversion_factor": 1,
-			# without a price list rate ERPNext ignores discount_percentage and
-			# keeps the full price, which inflated every discounted line
-			"price_list_rate": unit_price,
-			"rate": unit_price * (1 - discount / 100.0),
-			"discount_percentage": discount,
+			"rate": rate,
 			"cost_center": settings.cost_center,
 		}
 		if doctype == "Sales Invoice":
@@ -372,6 +390,29 @@ def build_item_rows(
 			common["expense_account"] = settings.purchase_expense_account
 		rows.append(common)
 	return rows
+
+
+def get_net_rounding_gap(
+	move: dict[str, Any],
+	items: list[dict[str, Any]],
+	discount_total: float,
+) -> float:
+	"""Measure how far the built rows drift from the untaxed total Odoo booked.
+
+	Odoo computes header totals from unrounded line values, so the sum of the
+	rounded line subtotals it exports can drift by a cent, and item rates are
+	stored at currency precision on top. The header is what reached SdI: the
+	gap is folded into the document level discount to land exactly on it.
+	"""
+	header_net = round(flt(move.get("untaxed_amount")), 2)
+	if not header_net or not items:
+		return 0.0
+	target = abs(header_net) + discount_total
+	actual = sum(abs(round(round(flt(row["rate"]), 2) * flt(row["qty"]), 2)) for row in items)
+	gap = round(actual - target, 2)
+	if abs(gap) > 0.05:
+		return 0.0
+	return gap
 
 
 def ensure_item_for_line(
@@ -420,7 +461,6 @@ def ensure_item_for_line(
 			"include_item_in_manufacturing": 0,
 			"is_sales_item": is_sales_item,
 			"is_purchase_item": is_purchase_item,
-			"standard_rate": flt(line.get("unit_price")),
 		}
 	)
 	doc.insert(ignore_permissions=True)
@@ -454,6 +494,7 @@ def build_invoice_payload(
 		"taxes": taxes,
 	}
 	_, discount_total = partition_move_lines(move)
+	discount_total += get_net_rounding_gap(move=move, items=items, discount_total=discount_total)
 	if discount_total:
 		# negative on returns: the discount must shrink the absolute value of an
 		# already negative net total
@@ -500,8 +541,10 @@ def build_tax_rows(
 
 	header_tax_amount = get_expected_tax_total(move=move, doctype=doctype, is_return=is_return)
 	line_tax_amount = round(sum(tax_map.values()), 2)
+	# per line rounding drifts a cent or two from the header total Odoo posted;
+	# the header is the booked truth, so absorb any gap into the first tax row
 	tax_gap = round(header_tax_amount - line_tax_amount, 2)
-	if abs(tax_gap) > 0.02 and tax_labels:
+	if tax_gap and tax_labels:
 		fallback_label = tax_labels[0]
 		fallback_account = get_tax_account_for_label(doctype=doctype, tax_label=fallback_label, settings=settings)
 		tax_map[(fallback_label, fallback_account)] += tax_gap
@@ -683,8 +726,9 @@ def rename_invoice(doctype: str, old_name: str, new_name: str):
 
 
 def validate_import_totals(move: dict[str, Any], doc, results: dict[str, Any]) -> None:
-	source_total = abs(flt(move.get("total_amount")))
-	if abs(source_total - flt(doc.grand_total)) > 0.02:
+	# grand_total is negative on returns while the source header is unsigned
+	source_total = round(abs(flt(move.get("total_amount"))), 2) * (-1 if is_return_move(move) else 1)
+	if abs(source_total - flt(doc.grand_total)) > 0.005:
 		results["warnings"].append(
 			f"{doc.doctype} {doc.name}: source total {source_total:.2f} != ERPNext total {flt(doc.grand_total):.2f}"
 		)
@@ -851,14 +895,21 @@ def get_income_account_for_line(line: dict[str, Any], settings: ERPNextImportSet
 
 
 def is_return_move(move: dict[str, Any]) -> bool:
+	move_type = cstr(move.get("move_type")).strip()
+	if move_type:
+		return move_type.endswith("_refund")
+	# older bundles carry no move_type: fall back to the line sign, rounded so
+	# float dust on zero total documents cannot flip the classification
 	line_total = sum(flt(line.get("total")) or flt(line.get("subtotal")) for line in move.get("lines") or [])
-	return line_total < 0
+	return round(line_total, 2) < 0
 
 
 def get_expected_tax_total(move: dict[str, Any], doctype: str, is_return: bool) -> float:
 	header_tax_amount = round(flt(move.get("tax_amount")), 2)
 	if is_return:
-		return header_tax_amount
+		# the exporter ships signed header amounts: negative for out_refund but
+		# positive for in_refund, while an ERPNext return always needs negative tax
+		return -abs(header_tax_amount)
 	if doctype == "Purchase Invoice":
 		return abs(header_tax_amount)
 	return header_tax_amount
