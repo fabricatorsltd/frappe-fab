@@ -50,6 +50,12 @@ FAB_CHILD_WORKSPACES = (
 		"new_name": "OpenAPI",
 	},
 	{
+		"app": "fab_f24",
+		"icon": "file",
+		"old_name": "F24",
+		"new_name": "F24",
+	},
+	{
 		"app": "fab_hr_italy",
 		"icon": "users",
 		"old_name": "HR Italy",
