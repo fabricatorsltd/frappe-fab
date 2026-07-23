@@ -101,7 +101,7 @@ after_migrate = "fab.install.after_migrate"
 # Name of the app being installed is passed as an argument
 
 # before_app_install = "fab.utils.before_app_install"
-# after_app_install = "fab.utils.after_app_install"
+after_app_install = "fab.install.after_app_install"
 
 # Integration Cleanup
 # -------------------

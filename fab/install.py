@@ -72,6 +72,12 @@ def after_migrate():
 	sync_fab_desktop_group()
 
 
+def after_app_install(app_name: str):
+	# every install reruns frappe's desktop icon creation, which recreates child
+	# icons from their workspace with the child app on them, so renormalize
+	sync_fab_desktop_group()
+
+
 def sync_fab_desktop_group():
 	installed_apps = set(frappe.get_installed_apps())
 	ensure_fab_parent_icon()
@@ -89,7 +95,6 @@ def sync_fab_desktop_group():
 			icon_name=workspace["icon"],
 		)
 		sync_desktop_icon(
-			app=workspace["app"],
 			icon_name=workspace["icon"],
 			old_name=workspace["old_name"],
 			new_name=workspace["new_name"],
@@ -331,7 +336,7 @@ def delete_stale_doc(doctype: str, old_name: str, new_name: str):
 		frappe.delete_doc(doctype, old_name, ignore_permissions=True)
 
 
-def sync_desktop_icon(app: str, icon_name: str, old_name: str, new_name: str):
+def sync_desktop_icon(icon_name: str, old_name: str, new_name: str):
 	if not frappe.db.exists("Desktop Icon", new_name) and frappe.db.exists("Desktop Icon", old_name):
 		rename_standard_doc("Desktop Icon", old_name, new_name)
 
@@ -348,7 +353,10 @@ def sync_desktop_icon(app: str, icon_name: str, old_name: str, new_name: str):
 	update_doc(
 		icon,
 		{
-			"app": app,
+			# the container owns the child icons: the sidebar menu filters them by
+			# the current app, which resolves to fab, and the artwork lookup builds
+			# its path from this field, and the files ship with fab
+			"app": "fab",
 			"icon": icon_name,
 			"icon_type": "Link",
 			"label": new_name,
