@@ -1099,7 +1099,9 @@ def get_temp_italy_state_code() -> str:
 
 
 def ensure_import_uom() -> str:
-	uom_name = "Imported Unit"
+	# FatturaPA UnitaMisura is capped at 10 characters; NR (numero) is the
+	# neutral default for goods and services without a physical measure
+	uom_name = "NR"
 	if frappe.db.exists("UOM", uom_name):
 		return uom_name
 	frappe.get_doc(
