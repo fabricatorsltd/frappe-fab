@@ -1,0 +1,20 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version:  fab\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-07-24 00:00+0000\n"
+"PO-Revision-Date: 2026-07-24 00:00+0000\n"
+"Last-Translator: FAB Team\n"
+"Language: it\n"
+"Language-Team: Italian\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+# Core Frappe desk string left untranslated upstream; supplied here so the
+# submittable-document banner reads Italian across the fab suite.
+msgid "Submit this document to confirm"
+msgstr "Contabilizza questo documento per confermarlo"
