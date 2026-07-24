@@ -17,4 +17,4 @@ msgstr ""
 # Core Frappe desk string left untranslated upstream; supplied here so the
 # submittable-document banner reads Italian across the fab suite.
 msgid "Submit this document to confirm"
-msgstr "Contabilizza questo documento per confermarlo"
+msgstr "Conferma questo documento per contabilizzarlo"
