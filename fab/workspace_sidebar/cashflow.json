@@ -3,7 +3,6 @@
  "creation": "2026-07-27 00:00:00",
  "docstatus": 0,
  "doctype": "Workspace Sidebar",
- "for_user": "",
  "header_icon": "money",
  "idx": 1,
  "items": [
@@ -64,7 +63,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-27 10:08:49.878398",
+ "modified": "2026-07-27 11:06:13.297366",
  "modified_by": "Administrator",
  "module": "FAB",
  "name": "Cashflow",

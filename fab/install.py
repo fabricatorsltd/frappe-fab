@@ -235,7 +235,13 @@ def sync_workspace_sidebar(old_name: str, new_name: str, icon_name: str):
 		sidebar,
 		{
 			"app": "fab",
-			"for_user": "",
+			# must be NULL, not "": auto_generate_sidebar_from_module dedups with
+			# exists("Workspace Sidebar", {"name": module, "for_user": None}). When a
+			# child module is named exactly like its sidebar (e.g. "MSP", "Cashflow"),
+			# an empty string fails that check, so the auto-generated in-memory sidebar
+			# (app=None) overwrites this one in the boot map and the app drops out of
+			# the sidebar app switcher.
+			"for_user": None,
 			"header_icon": icon_name,
 			"items": build_workspace_sidebar_items(workspace),
 			"module": FAB_MODULE,
