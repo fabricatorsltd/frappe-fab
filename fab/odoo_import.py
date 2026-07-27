@@ -68,6 +68,17 @@ TAX_FIELDS = [
 	"amount",
 	"type_tax_use",
 ]
+PAYMENT_FIELDS = [
+	"name",
+	"date",
+	"amount",
+	"payment_type",
+	"journal_id",
+	"partner_id",
+	"currency_id",
+	"reconciled_invoice_ids",
+	"reconciled_bill_ids",
+]
 
 
 @dataclass(slots=True)
@@ -214,6 +225,8 @@ def export_odoo_invoice_bundle(
 		company_id=company_id,
 	)
 
+	payments = fetch_payments(client=client, date_from=date_from, company_id=company_id)
+
 	bundle = {
 		"date_from": date_from,
 		"filters": {
@@ -226,9 +239,11 @@ def export_odoo_invoice_bundle(
 				"move_types": [SUPPLIER_MOVE_TYPE, SUPPLIER_REFUND_TYPE],
 				"state": "posted",
 			},
+			"payments": {"state": "posted", "date_from": date_from},
 		},
 		"customer_invoices": customer_invoices,
 		"supplier_invoices": supplier_invoices,
+		"payments": payments,
 	}
 	return write_invoice_bundle(bundle, output_dir)
 
@@ -357,12 +372,110 @@ def normalize_move(
 	}
 
 
+def fetch_payments(
+	client: OdooClient,
+	date_from: str,
+	company_id: int | None = None,
+) -> list[dict[str, Any]]:
+	# account.payment has its own state machine (draft/in_process/paid/canceled/
+	# rejected); "posted" is the related move's state, not the payment's
+	domain: list[list[Any]] = [
+		["state", "in", ["paid", "in_process"]],
+		["date", ">=", date_from],
+	]
+	if company_id is not None:
+		domain.append(["company_id", "=", company_id])
+	payments = client.search_read(
+		"account.payment", domain, fields=PAYMENT_FIELDS, order="date asc, id asc"
+	)
+	move_ids = unique_ids(
+		move_id
+		for payment in payments
+		for move_id in (
+			(payment.get("reconciled_invoice_ids") or [])
+			+ (payment.get("reconciled_bill_ids") or [])
+		)
+	)
+	move_lookup = {
+		row["id"]: row for row in client.read("account.move", move_ids, ["name", "move_type"])
+	}
+
+	# resolve each journal to its bank GL account code so the importer can map to
+	# the ERPNext account by number (Odoo CoA was replicated), no hardcoded accounts
+	journal_ids = unique_ids(value_id(payment.get("journal_id")) for payment in payments)
+	journals = {
+		row["id"]: row
+		for row in client.read("account.journal", journal_ids, ["default_account_id"])
+	}
+	account_ids = unique_ids(value_id(row.get("default_account_id")) for row in journals.values())
+	account_codes = {row["id"]: row.get("code") for row in client.read("account.account", account_ids, ["code"])}
+
+	def journal_account_code(journal_id: int | None) -> str:
+		journal = journals.get(journal_id) or {}
+		account_id = value_id(journal.get("default_account_id"))
+		return account_codes.get(account_id) or ""
+
+	normalized: list[dict[str, Any]] = []
+	for payment in payments:
+		# keep a payment only when it settles at least one invoice/bill we can match
+		# by number; is_reconciled is about bank-statement matching, not invoice
+		# settlement, so it is deliberately not used as a filter here
+		linked = (payment.get("reconciled_invoice_ids") or []) + (
+			payment.get("reconciled_bill_ids") or []
+		)
+		invoices = [
+			{"name": move_lookup[move_id]["name"], "move_type": move_lookup[move_id].get("move_type") or ""}
+			for move_id in linked
+			if move_lookup.get(move_id, {}).get("name")
+		]
+		if not invoices:
+			continue
+		normalized.append(
+			normalize_payment(payment, invoices, journal_account_code(value_id(payment.get("journal_id"))))
+		)
+	return normalized
+
+
+def normalize_payment(
+	payment: dict[str, Any], invoices: list[dict[str, Any]], journal_account_code: str
+) -> dict[str, Any]:
+	return {
+		"odoo_id": payment["id"],
+		"name": payment.get("name") or "",
+		"date": payment.get("date") or "",
+		"amount": payment.get("amount") or 0.0,
+		"payment_type": payment.get("payment_type") or "",
+		"journal": display_name(payment.get("journal_id")),
+		"journal_account_code": journal_account_code,
+		"currency": display_name(payment.get("currency_id")),
+		"partner_name": display_name(payment.get("partner_id")),
+		"invoices": invoices,
+	}
+
+
+def flatten_payments(payments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	return [
+		{
+			"odoo_id": payment["odoo_id"],
+			"name": payment["name"],
+			"date": payment["date"],
+			"amount": payment["amount"],
+			"payment_type": payment["payment_type"],
+			"journal": payment["journal"],
+			"partner_name": payment["partner_name"],
+			"invoices": " | ".join(inv["name"] for inv in payment.get("invoices") or []),
+		}
+		for payment in payments
+	]
+
+
 def write_invoice_bundle(bundle: dict[str, Any], output_dir: str) -> dict[str, Any]:
 	output_path = Path(output_dir).expanduser().resolve()
 	output_path.mkdir(parents=True, exist_ok=True)
 
 	customer_invoices = bundle["customer_invoices"]
 	supplier_invoices = bundle["supplier_invoices"]
+	payments = bundle.get("payments") or []
 	customer_lines = flatten_move_lines(customer_invoices)
 	supplier_lines = flatten_move_lines(supplier_invoices)
 	customer_partners = unique_partner_rows(customer_invoices)
@@ -377,6 +490,7 @@ def write_invoice_bundle(bundle: dict[str, Any], output_dir: str) -> dict[str, A
 	write_csv(output_path / "odoo_supplier_invoice_lines.csv", supplier_lines)
 	write_csv(output_path / "odoo_supplier_partners.csv", supplier_partners)
 	write_csv(output_path / "odoo_products.csv", products)
+	write_csv(output_path / "odoo_payments.csv", flatten_payments(payments))
 
 	return {
 		"output_dir": str(output_path),
@@ -387,6 +501,7 @@ def write_invoice_bundle(bundle: dict[str, Any], output_dir: str) -> dict[str, A
 		"product_count": len(products),
 		"customer_partner_count": len(customer_partners),
 		"supplier_partner_count": len(supplier_partners),
+		"payment_count": len(payments),
 	}
 
 

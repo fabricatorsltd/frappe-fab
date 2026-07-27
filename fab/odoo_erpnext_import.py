@@ -90,6 +90,11 @@ def import_odoo_invoice_bundle(
 		if processed % commit_every == 0:
 			frappe.db.commit()
 
+	frappe.db.commit()
+	create_payment_entries_from_bundle(bundle=bundle, settings=settings, results=results)
+	frappe.db.commit()
+	close_settled_invoices_fallback(bundle=bundle, settings=settings, results=results)
+
 	reset_invoice_series_counters()
 	frappe.db.commit()
 	frappe.clear_cache()
@@ -161,7 +166,18 @@ def rebuild_mismatched_documents(
 
 
 def delete_imported_document(doctype: str, name: str) -> None:
-	"""Remove an imported invoice together with its settlement journal entries."""
+	"""Remove an imported invoice together with its settlement journal entries and payments."""
+	payment_names = frappe.get_all(
+		"Payment Entry Reference",
+		filters={"reference_doctype": doctype, "reference_name": name},
+		pluck="parent",
+		distinct=True,
+	)
+	for payment_name in set(payment_names):
+		payment = frappe.get_doc("Payment Entry", payment_name)
+		if payment.docstatus == 1:
+			payment.cancel()
+		frappe.delete_doc("Payment Entry", payment_name, force=1, ignore_permissions=True)
 	journal_names = frappe.get_all(
 		"Journal Entry Account",
 		filters={"reference_type": doctype, "reference_name": name},
@@ -865,20 +881,179 @@ def finalize_imported_document(
 			f"{doc.doctype} {doc.name}: source state is cancelled; imported as draft to avoid GL reversal locking."
 		)
 	validate_import_totals(move=move, doc=doc, results=results)
-	if submitted:
-		close_settled_invoice(doc=doc, move=move, settings=settings, results=results)
 
 
 SETTLED_PAYMENT_STATES = ("paid", "in_payment")
 
+# journal display-name fragment -> Mode of Payment; the bank account itself is
+# resolved from the exported journal account code, so only the (informational)
+# mode is mapped here
+PAYMENT_JOURNAL_MODES = (
+	("american express", "American Express"),
+	("sella", "Wire Transfer"),
+	("cash", "Cash"),
+)
+ODOO_PAYMENT_REFERENCE_PREFIX = "ODOO-PAY-"
+
+
+def create_payment_entries_from_bundle(
+	bundle: dict[str, Any], settings: ERPNextImportSettings, results: dict[str, Any]
+) -> None:
+	"""Close invoices with real Payment Entries built from Odoo's payment records.
+
+	Each account.payment carries its date, amount, bank journal and the invoices it
+	settled; replaying it as a Payment Entry posts to the real bank account (so the
+	CBI statements reconcile against it) instead of the clearing wash.
+	"""
+	bucket = results.setdefault("payments", {"created": 0, "skipped": 0, "unmatched": 0})
+	for payment in bundle.get("payments") or []:
+		frappe.db.savepoint("before_payment")
+		try:
+			create_payment_entry_from_odoo(payment, settings, results, bucket)
+		except Exception as exc:  # noqa: BLE001 - isolate one payment, keep the run going
+			frappe.db.rollback(save_point="before_payment")
+			results["warnings"].append(
+				f"Payment {payment.get('name') or payment.get('odoo_id')}: skipped, {exc}"
+			)
+			increment(bucket, "unmatched")
+
+
+def create_payment_entry_from_odoo(
+	payment: dict[str, Any],
+	settings: ERPNextImportSettings,
+	results: dict[str, Any],
+	bucket: dict[str, int],
+) -> None:
+	reference_no = f"{ODOO_PAYMENT_REFERENCE_PREFIX}{payment.get('odoo_id')}"
+	if frappe.db.exists("Payment Entry", {"reference_no": reference_no, "docstatus": ["<", 2]}):
+		increment(bucket, "skipped")
+		return
+
+	currency = cstr(payment.get("currency")).strip()
+	if currency and currency != settings.currency:
+		results["warnings"].append(
+			f"Payment {reference_no}: currency {currency} is not {settings.currency}, left to clearing fallback"
+		)
+		increment(bucket, "unmatched")
+		return
+
+	invoices = payment.get("invoices") or []
+	# a credit-note refund needs a signed, opposite-direction allocation; rather
+	# than risk a wrong-signed close, leave any payment touching a return to the
+	# clearing fallback
+	if any(cstr(invoice.get("move_type")).endswith("_refund") for invoice in invoices):
+		results["warnings"].append(
+			f"Payment {reference_no}: settles a credit note, left to clearing fallback"
+		)
+		increment(bucket, "unmatched")
+		return
+
+	amount = flt(payment.get("amount"))
+	is_receive = cstr(payment.get("payment_type")).lower() == "inbound"
+
+	references: list[dict[str, Any]] = []
+	party = party_account = party_type = None
+	remaining = amount
+	for invoice in invoices:
+		name = invoice.get("name")
+		# the invoice side comes from the move type, not the payment direction, so a
+		# supplier refund (inbound against a purchase) still routes to the right doc
+		is_sales = cstr(invoice.get("move_type")).startswith("out")
+		doctype = "Sales Invoice" if is_sales else "Purchase Invoice"
+		if not name or not frappe.db.exists(doctype, name):
+			continue
+		party_field, account_field = ("customer", "debit_to") if is_sales else ("supplier", "credit_to")
+		docstatus, outstanding, inv_party, inv_party_account = frappe.db.get_value(
+			doctype, name, ["docstatus", "outstanding_amount", party_field, account_field]
+		)
+		if docstatus != 1 or not flt(outstanding) or remaining <= 0:
+			continue
+		if party and inv_party != party:
+			results["warnings"].append(f"Payment {reference_no}: mixed parties, {name} skipped")
+			continue
+		party = party or inv_party
+		party_type = party_type or ("Customer" if is_sales else "Supplier")
+		party_account = party_account or inv_party_account
+		allocated = min(remaining, flt(outstanding))
+		references.append(
+			{"reference_doctype": doctype, "reference_name": name, "allocated_amount": allocated}
+		)
+		remaining -= allocated
+
+	if not references or not party:
+		increment(bucket, "unmatched")
+		return
+
+	bank_account = resolve_payment_bank_account(settings, payment.get("journal_account_code"))
+	if not bank_account:
+		results["warnings"].append(
+			f"Payment {reference_no}: no bank account for journal code {payment.get('journal_account_code')!r}"
+		)
+		increment(bucket, "unmatched")
+		return
+
+	entry = frappe.get_doc(
+		{
+			"doctype": "Payment Entry",
+			"payment_type": "Receive" if is_receive else "Pay",
+			"company": settings.company,
+			"posting_date": payment.get("date"),
+			"mode_of_payment": resolve_payment_mode(payment.get("journal")),
+			"party_type": party_type,
+			"party": party,
+			# paid_from/paid_to follow the money direction; the party side above
+			# follows the invoice, so refunds still post the right legs
+			"paid_from": party_account if is_receive else bank_account,
+			"paid_to": bank_account if is_receive else party_account,
+			# post the full movement so the CBI bank line reconciles; any excess over
+			# the allocated invoices lands as an advance on the party
+			"paid_amount": amount,
+			"received_amount": amount,
+			"source_exchange_rate": 1,
+			"target_exchange_rate": 1,
+			"reference_no": reference_no,
+			"reference_date": payment.get("date"),
+			"remarks": f"Odoo payment {payment.get('name') or payment.get('odoo_id')}",
+			"references": references,
+		}
+	)
+	entry.flags.ignore_permissions = True
+	entry.insert()
+	entry.submit()
+	increment(bucket, "created")
+
+
+def resolve_payment_bank_account(settings: ERPNextImportSettings, journal_code: str | None) -> str | None:
+	if not journal_code:
+		return None
+	return frappe.db.get_value(
+		"Account",
+		{
+			"company": settings.company,
+			"account_number": journal_code,
+			"account_type": ["in", ["Bank", "Cash"]],
+			"is_group": 0,
+			"disabled": 0,
+		},
+		"name",
+	)
+
+
+def resolve_payment_mode(journal: str | None) -> str | None:
+	low = cstr(journal).lower()
+	for fragment, mode in PAYMENT_JOURNAL_MODES:
+		if fragment in low and frappe.db.exists("Mode of Payment", mode):
+			return mode
+	return None
+
 
 def close_settled_invoice(doc, move: dict[str, Any], settings: ERPNextImportSettings, results: dict[str, Any]) -> None:
-	"""Clear the open balance of invoices Odoo reports as settled.
+	"""Clearing-account fallback for invoices Odoo reports settled but with no payment.
 
-	Source payments are not migrated, so without this every historical invoice
-	would sit in the ageing report as receivable or payable. The offset goes to
-	a dedicated clearing account: its balance shows the migration adjustment at
-	a glance and keeps real bank accounts out of it.
+	The payment pass closes anything Odoo has an account.payment for. What remains
+	settled-but-open (paid off by a credit note, write-off, or simply not tracked on
+	Odoo's side) is washed to the clearing account so it leaves the ageing report;
+	its balance shows the residual migration adjustment at a glance.
 	"""
 	if doc.docstatus != 1:
 		return
@@ -922,6 +1097,22 @@ def close_settled_invoice(doc, move: dict[str, Any], settings: ERPNextImportSett
 	entry.insert()
 	entry.submit()
 	increment(results.setdefault("closures", {}), "settled")
+
+
+def close_settled_invoices_fallback(
+	bundle: dict[str, Any], settings: ERPNextImportSettings, results: dict[str, Any]
+) -> None:
+	"""Wash to clearing only what the payment pass could not close."""
+	for doctype, moves in (
+		("Sales Invoice", bundle.get(CUSTOMER_BUNDLE_KEY, [])),
+		("Purchase Invoice", bundle.get(SUPPLIER_BUNDLE_KEY, [])),
+	):
+		for move in moves:
+			name = get_target_document_name(move=move, doctype=doctype)
+			if not name or not frappe.db.exists(doctype, name):
+				continue
+			doc = frappe.get_doc(doctype, name)
+			close_settled_invoice(doc=doc, move=move, settings=settings, results=results)
 
 
 def ensure_migration_clearing_account(settings: ERPNextImportSettings) -> str:
