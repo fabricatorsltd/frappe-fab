@@ -1,0 +1,74 @@
+{
+ "app": "fab",
+ "creation": "2026-07-27 00:00:00",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "for_user": "",
+ "header_icon": "money",
+ "idx": 1,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Home",
+   "link_to": "Cashflow",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Cash Flow Forecast",
+   "link_to": "Cash Flow Forecast",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Calendar",
+   "link_to": "Cash Flow Event",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Recurring Payments",
+   "link_to": "Recurring Payment",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Settings",
+   "link_to": "Cash Flow Settings",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-07-27 10:08:49.878398",
+ "modified_by": "Administrator",
+ "module": "FAB",
+ "name": "Cashflow",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Cashflow"
+}

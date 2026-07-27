@@ -67,6 +67,18 @@ FAB_CHILD_WORKSPACES = (
 		"old_name": "Jet HR Import",
 		"new_name": "Jet HR Import",
 	},
+	{
+		"app": "fab_msp",
+		"icon": "tool",
+		"old_name": "MSP",
+		"new_name": "MSP",
+	},
+	{
+		"app": "fab_cashflow",
+		"icon": "money",
+		"old_name": "Cashflow",
+		"new_name": "Cashflow",
+	},
 )
 
 
