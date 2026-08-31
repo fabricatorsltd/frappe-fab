@@ -1,0 +1,148 @@
+[
+ {
+  "apply_sla_for_resolution": 1,
+  "condition": "doc.customer == \"3SMB SRL\" and doc.ticket_type in (\"Incident\", \"Bug\")",
+  "condition_json": null,
+  "default_priority": "P3",
+  "default_sla": 0,
+  "default_ticket_status": null,
+  "description": "SLA incidenti/problemi 3SMB (P1-P4). Non si applica a richieste o nuove funzionalità.",
+  "docstatus": 0,
+  "doctype": "HD Service Level Agreement",
+  "enabled": 1,
+  "end_date": null,
+  "fab_policy_html": "<p>Lo SLA seguente si applica a <b>incidenti e problemi</b>. Non si applica a richieste generiche o di nuova funzionalita'.</p>\n<h4>P1 - Critica</h4>\n<p><b>Condizioni:</b> piattaforma totalmente indisponibile in produzione; funzionalita' core inutilizzabile per la totalita' degli utenti; errore bloccante su processi essenziali (es. gestione appuntamenti).</p>\n<ul><li>Presa in carico: entro 4 ore lavorative</li><li>Intervento iniziale: entro 8 ore lavorative</li><li>Risoluzione: soluzione o workaround entro 1 giorno lavorativo</li></ul>\n<h4>P2 - Alta</h4>\n<p><b>Condizioni:</b> funzionalita' principale degradata ma sistema operativo; errore che impatta piu' utenti ma con workaround disponibile; problemi di performance rilevanti.</p>\n<ul><li>Presa in carico: entro 8 ore lavorative</li><li>Intervento iniziale: entro 1 giorno lavorativo</li><li>Risoluzione: entro 2 giorni lavorativi</li></ul>\n<h4>P3 - Media</h4>\n<p><b>Condizioni:</b> bug non bloccante; anomalie grafiche o comportamentali minori; funzionalita' secondarie non critiche.</p>\n<ul><li>Presa in carico: entro 2 giorni lavorativi</li><li>Risoluzione: entro 5 giorni lavorativi</li></ul>\n<h4>P4 - Bassa</h4>\n<p><b>Condizioni:</b> migliorie; ottimizzazioni; richieste informative.</p>\n<ul><li>Presa in carico: pianificata nel ciclo evolutivo ordinario</li></ul>",
+  "holiday_list": "FAB Working Days",
+  "modified": "2026-07-31 08:46:58.863737",
+  "name": "3SMB SRL - Incident SLA",
+  "priorities": [
+   {
+    "default_priority": 0,
+    "priority": "P1",
+    "resolution_time": 28800.0,
+    "response_time": 14400.0
+   },
+   {
+    "default_priority": 0,
+    "priority": "P2",
+    "resolution_time": 57600.0,
+    "response_time": 28800.0
+   },
+   {
+    "default_priority": 1,
+    "priority": "P3",
+    "resolution_time": 144000.0,
+    "response_time": 57600.0
+   },
+   {
+    "default_priority": 0,
+    "priority": "P4",
+    "resolution_time": 864000.0,
+    "response_time": 288000.0
+   }
+  ],
+  "service_level": "3SMB SRL - Incident SLA",
+  "start_date": null,
+  "support_and_resolution": [
+   {
+    "end_time": "18:00:00",
+    "start_time": "9:00:00",
+    "workday": "Monday"
+   },
+   {
+    "end_time": "18:00:00",
+    "start_time": "9:00:00",
+    "workday": "Tuesday"
+   },
+   {
+    "end_time": "18:00:00",
+    "start_time": "9:00:00",
+    "workday": "Wednesday"
+   },
+   {
+    "end_time": "18:00:00",
+    "start_time": "9:00:00",
+    "workday": "Thursday"
+   },
+   {
+    "end_time": "18:00:00",
+    "start_time": "9:00:00",
+    "workday": "Friday"
+   }
+  ],
+  "ticket_reopen_status": null
+ },
+ {
+  "apply_sla_for_resolution": 1,
+  "condition": "(doc.raised_by or \"\").lower().endswith(\"@royalyacht.it\") or doc.customer == \"Royal Yacht SARL\"",
+  "condition_json": null,
+  "default_priority": "P3",
+  "default_sla": 0,
+  "default_ticket_status": null,
+  "description": null,
+  "docstatus": 0,
+  "doctype": "HD Service Level Agreement",
+  "enabled": 1,
+  "end_date": null,
+  "fab_policy_html": "<p>This ticket is an <strong>Incident</strong>: the service levels below apply, based on the priority you select. Targets are counted during office hours (Monday to Friday, 08:30-18:00).</p><table><thead><tr><th>Priority</th><th>When to use</th><th>Taken in charge</th><th>Resolved</th></tr></thead><tbody><tr><td><strong>P1 - Urgent</strong></td><td>Persistent problems causing complete service disruption</td><td>1 hour</td><td>6 hours</td></tr><tr><td><strong>P2 - High</strong></td><td>Non-persistent problems without complete disruption</td><td>2 hours</td><td>12 hours</td></tr><tr><td><strong>P3 - Normal</strong></td><td>Evident difficulty using the services or devices</td><td>4 hours</td><td>24 hours</td></tr><tr><td><strong>P4 - Low</strong></td><td>Information requests and minor problems</td><td>6 hours</td><td>48 hours</td></tr></tbody></table><p>The support team may adjust the declared priority, giving a justification.</p>",
+  "holiday_list": "FAB Working Days",
+  "modified": "2026-08-31 23:36:14.401066",
+  "name": "Royal Yacht SARL",
+  "priorities": [
+   {
+    "default_priority": 0,
+    "priority": "P1",
+    "resolution_time": 21600.0,
+    "response_time": 3600.0
+   },
+   {
+    "default_priority": 0,
+    "priority": "P2",
+    "resolution_time": 43200.0,
+    "response_time": 7200.0
+   },
+   {
+    "default_priority": 1,
+    "priority": "P3",
+    "resolution_time": 86400.0,
+    "response_time": 14400.0
+   },
+   {
+    "default_priority": 0,
+    "priority": "P4",
+    "resolution_time": 172800.0,
+    "response_time": 21600.0
+   }
+  ],
+  "service_level": "Royal Yacht SARL",
+  "start_date": null,
+  "support_and_resolution": [
+   {
+    "end_time": "18:00:00",
+    "start_time": "8:30:00",
+    "workday": "Monday"
+   },
+   {
+    "end_time": "18:00:00",
+    "start_time": "8:30:00",
+    "workday": "Tuesday"
+   },
+   {
+    "end_time": "18:00:00",
+    "start_time": "8:30:00",
+    "workday": "Wednesday"
+   },
+   {
+    "end_time": "18:00:00",
+    "start_time": "8:30:00",
+    "workday": "Thursday"
+   },
+   {
+    "end_time": "18:00:00",
+    "start_time": "8:30:00",
+    "workday": "Friday"
+   }
+  ],
+  "ticket_reopen_status": null
+ }
+]

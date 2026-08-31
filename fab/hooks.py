@@ -90,6 +90,16 @@ doctype_list_js = {"Sales Invoice": "public/js/sales_invoice_list.js"}
 after_install = "fab.install.after_install"
 after_migrate = "fab.install.after_migrate"
 
+# Config-as-code: FABRICATORS helpdesk data (holiday list must import before the
+# SLAs that reference it).
+fixtures = [
+	{"dt": "HD Service Holiday List", "filters": [["name", "=", "FAB Working Days"]]},
+	{
+		"dt": "HD Service Level Agreement",
+		"filters": [["name", "in", ["Royal Yacht SARL", "3SMB SRL - Incident SLA"]]],
+	},
+]
+
 # Uninstallation
 # ------------
 

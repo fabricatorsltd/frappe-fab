@@ -1,0 +1,17 @@
+[
+ {
+  "color": null,
+  "description": null,
+  "docstatus": 0,
+  "doctype": "HD Service Holiday List",
+  "from_date": "2026-01-01",
+  "holiday_list_name": "FAB Working Days",
+  "holidays": [],
+  "modified": "2026-07-31 08:29:42.168889",
+  "name": "FAB Working Days",
+  "recurring_holidays": null,
+  "to_date": "2026-12-31",
+  "total_holidays": 0,
+  "weekly_off": ""
+ }
+]
