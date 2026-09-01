@@ -150,13 +150,13 @@ after_app_install = "fab.install.after_app_install"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+# Billing documents (invoices, payments, statements) are emailed from the
+# billing account instead of the site default, which the helpdesk owns.
+doc_events = {
+	"Communication": {
+		"before_insert": "fab.email_routing.route_billing_sender",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
