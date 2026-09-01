@@ -85,11 +85,35 @@ FAB_CHILD_WORKSPACES = (
 def after_install():
 	sync_fab_desktop_group()
 	ensure_helpdesk_org_settings()
+	ensure_website_languages()
 
 
 def after_migrate():
 	sync_fab_desktop_group()
 	ensure_helpdesk_org_settings()
+	ensure_website_languages()
+
+
+# Languages our customers speak: the only ones we fully translate and the only
+# ones offered by the website language picker.
+CUSTOMER_LANGUAGES = ("it", "en", "fr", "es")
+
+
+def ensure_website_languages():
+	"""Show the standard Frappe language picker on the website/auth pages and
+	restrict the offered languages to the customer set. The other bundled
+	languages are disabled so the picker never offers a locale we do not
+	translate."""
+	if frappe.db.exists("DocType", "Website Settings"):
+		frappe.db.set_single_value("Website Settings", "show_language_picker", 1)
+	for name in frappe.get_all("Language", pluck="name"):
+		frappe.db.set_value(
+			"Language",
+			name,
+			"enabled",
+			1 if name in CUSTOMER_LANGUAGES else 0,
+			update_modified=False,
+		)
 
 
 def ensure_helpdesk_org_settings():
