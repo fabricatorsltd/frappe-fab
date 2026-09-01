@@ -217,7 +217,8 @@ doc_events = {
 
 # Request Events
 # ----------------
-# before_request = ["fab.utils.before_request"]
+# PDF downloads without an explicit generator must follow the print format.
+before_request = ["fab.print_format.set_pdf_generator"]
 # after_request = ["fab.utils.after_request"]
 
 # Job Events

@@ -109,3 +109,23 @@ def ensure_sales_invoice_print_format():
 		},
 		validate_fields_for_doctype=False,
 	)
+
+
+def set_pdf_generator():
+	"""before_request: download_pdf falls back to wkhtmltopdf when the request
+	carries no pdf_generator, ignoring the print format's own setting. Fill it
+	in from the format (or the doctype default) so PDF downloads match Print."""
+	form = frappe.local.form_dict
+	# before_request runs before the API layer sets form_dict.cmd: read the path
+	path = getattr(frappe.local, "request", None) and frappe.local.request.path or ""
+	method = form.get("cmd") or path.rsplit("/", 1)[-1]
+	if method != "frappe.utils.print_format.download_pdf" or form.get("pdf_generator"):
+		return
+	print_format = form.get("format")
+	if not print_format and form.get("doctype"):
+		print_format = frappe.get_meta(form.doctype).default_print_format
+	if not print_format or not frappe.db.exists("Print Format", print_format):
+		return
+	generator = frappe.get_cached_value("Print Format", print_format, "pdf_generator")
+	if generator:
+		form.pdf_generator = generator
