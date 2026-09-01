@@ -94,8 +94,9 @@ def after_migrate():
 
 def ensure_helpdesk_org_settings():
 	"""FABRICATORS org defaults on HD Settings: the brand shown in invites, the
-	default ticket priority (email tickets carry none) and instant agent-reply
-	delivery. Idempotent; skipped if helpdesk is not installed."""
+	default ticket priority (email tickets carry none), instant agent-reply
+	delivery and the agent notification on every customer reply. Idempotent;
+	skipped if helpdesk is not installed."""
 	if not frappe.db.exists("DocType", "HD Settings"):
 		return
 	frappe.db.set_single_value(
@@ -105,6 +106,7 @@ def ensure_helpdesk_org_settings():
 			"default_priority": "P2",
 			"instantly_send_email": 1,
 			"send_acknowledgement_email": 1,
+			"enable_reply_email_to_agent": 1,
 		},
 	)
 
