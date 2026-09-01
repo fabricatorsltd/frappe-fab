@@ -86,12 +86,20 @@ def after_install():
 	sync_fab_desktop_group()
 	ensure_helpdesk_org_settings()
 	ensure_website_languages()
+	ensure_print_formats()
 
 
 def after_migrate():
 	sync_fab_desktop_group()
 	ensure_helpdesk_org_settings()
 	ensure_website_languages()
+	ensure_print_formats()
+
+
+def ensure_print_formats():
+	from fab.print_format import ensure_all
+
+	ensure_all()
 
 
 # Languages our customers speak: the only ones we fully translate and the only

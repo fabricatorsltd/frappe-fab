@@ -1,0 +1,167 @@
+{#- FABRICATORS sales invoice, "Registro" layout. Rendered with the Chrome PDF generator.
+    Sizes are the approved mockup values (560px content width) scaled by 1.25. -#}
+{%- set company = frappe.get_doc("Company", doc.company) -%}
+{%- set bank_accounts = frappe.get_all("Bank Account", filters={"company": doc.company, "is_company_account": 1}, fields=["name", "bank", "iban", "is_default"], order_by="is_default desc, creation asc", limit=1) -%}
+{%- set bank = bank_accounts[0] if bank_accounts else None -%}
+{%- set bic = frappe.db.get_value("Bank", bank.bank, "swift_number") if bank else None -%}
+{%- set address = frappe.get_doc("Address", doc.customer_address) if doc.customer_address else None -%}
+{%- set payment = doc.payment_terms_template or "Bonifico bancario" -%}
+{%- set closing_rows = 2 if doc.items|length > 2 else 0 -%}
+{%- set split_at = doc.items|length - closing_rows -%}
+{%- set plain_uoms = ["NR", "Nos", "Unit", "Pz", "PZ"] -%}
+{%- set note = (doc.terms | striptags | trim) if doc.terms else "Copia di cortesia: fa fede l'XML trasmesso allo SdI." -%}
+
+{%- macro money(v) -%}{{ frappe.utils.fmt_money(v, 2) }}{%- endmacro -%}
+{%- macro qty(item) -%}
+	{%- set q = item.qty|int if item.qty == item.qty|int else item.qty -%}
+	{{ q }}{% if item.uom and item.uom not in plain_uoms %} {{ item.uom }}{% endif %}
+{%- endmacro -%}
+{%- macro pct(v) -%}{{ (v|int if v == v|int else v)|string }}%{%- endmacro -%}
+{%- macro vat_rate(item) -%}
+	{%- if item.get("tax_rate") -%}{{ pct(item.tax_rate) }}
+	{%- elif doc.net_total -%}{{ pct((doc.total_taxes_and_charges / doc.net_total * 100)|round(0)) }}
+	{%- else -%}0%{%- endif -%}
+{%- endmacro -%}
+{%- macro line(item) -%}
+	{%- if item.get("fab_section") %}<tr class="band"><td colspan="6">{{ item.fab_section }}</td></tr>{% endif -%}
+	{%- set name = item.item_name or item.item_code -%}
+	{%- set code = item.item_code -%}
+	{%- if name.startswith("[") and "]" in name -%}
+		{%- set code = name[1:name.index("]")] -%}
+		{%- set name = name[name.index("]") + 1:].strip() -%}
+	{%- endif -%}
+	{#- description is plain text with newlines (imported) or HTML (editor): turn block ends into newlines before stripping tags per line -#}
+	{%- set raw = (item.description or "") | replace("<br>", "\n") | replace("<br/>", "\n") | replace("<br />", "\n") | replace("</div>", "\n") | replace("</p>", "\n") | replace("</li>", "\n") -%}
+	{%- set ns = namespace(lines=[]) -%}
+	{%- for l in raw.split("\n") -%}
+		{%- set l = l | striptags | trim -%}
+		{%- if l and not (loop.first and l == (item.item_name or "").strip()) -%}{%- set ns.lines = ns.lines + [l] -%}{%- endif -%}
+	{%- endfor -%}
+	{%- set lines = ns.lines -%}
+	<tr>
+		<td><span class="code">{{ code }}</span> {{ name }}{% if lines %}<div class="sub">{{ lines | join("<br>") }}</div>{% endif %}</td>
+		<td class="n">{{ qty(item) }}</td>
+		<td class="n">{{ money(item.rate) }}</td>
+		<td class="n">{{ pct(item.discount_percentage or 0) }}</td>
+		<td class="n">{{ vat_rate(item) }}</td>
+		<td class="n">{{ money(item.amount) }} €</td>
+	</tr>
+	{%- if item.get("fab_note") %}<tr class="band note"><td colspan="6">{{ item.fab_note | striptags | replace("\n", "<br>") }}</td></tr>{% endif -%}
+{%- endmacro -%}
+
+<style>
+.print-format{margin-top:4mm;margin-bottom:5mm;margin-left:12mm;margin-right:12mm;page-size:A4;header-spacing:8px}
+div.print-format{margin:0!important;padding:0!important;max-width:none!important;min-height:0!important;font-family:Montserrat,sans-serif!important;font-size:13.75px!important;color:#14110F!important;line-height:1.45!important}
+.reg{font-family:Montserrat,sans-serif;font-size:13.75px;color:#14110F;line-height:1.45}
+.reg *{box-sizing:border-box}
+.reg .hd{display:grid;grid-template-columns:1fr auto;gap:30px;align-items:end}
+.reg .hd .num{text-align:right}
+.reg .wm{height:42.5px;width:auto;display:block}
+.reg .tag{color:#FF6700;font-weight:600;font-size:13.13px;margin-top:5px}
+.reg .n1{font-size:11.88px;letter-spacing:.14em;text-transform:uppercase;color:#857B72;font-weight:600}
+.reg .n2{font-size:18.75px;font-weight:700;line-height:1.2;letter-spacing:.01em}
+.reg .n3{color:#FF6700;font-weight:600;font-size:12.5px;margin-top:2.5px}
+.reg .rail{margin-top:22.5px;border-top:2px solid #FF6700;border-bottom:1px solid #E3DCD4;display:grid;grid-template-columns:1.6fr 1fr 1.4fr;gap:15px 25px;padding:12.5px 0}
+.reg .lbl{font-size:11.88px;letter-spacing:.12em;text-transform:uppercase;color:#857B72;font-weight:600}
+.reg .v{font-weight:600;margin-top:1.25px}
+.reg .lbl+.v+.lbl{margin-top:8.75px}
+.reg .small{font-size:13.13px}
+.reg table.lines{width:100%;border-collapse:collapse;margin-top:17.5px;border:0}
+.reg table.lines thead{display:table-header-group}
+.reg table.lines tr{break-inside:avoid;page-break-inside:avoid}
+.reg table.lines tbody.closing{break-inside:avoid;page-break-inside:avoid}
+.reg table.lines th{text-align:left;font-size:11.88px;letter-spacing:.1em;text-transform:uppercase;color:#857B72;font-weight:600;padding:7.5px;border:0;border-bottom:1.5px solid #14110F;background:none}
+.reg table.lines td{padding:7.5px;font-size:13.75px;vertical-align:top;border:0;border-bottom:1px solid #E3DCD4;background:none}
+.reg .n{text-align:right;white-space:nowrap}
+.reg .code{color:#857B72;font-size:12.5px;letter-spacing:.04em}
+.reg .sub{color:#4A423C;font-size:12.5px;margin-top:2.5px}
+.reg table.lines tr.band td{background:#FAF7F3;font-style:italic;color:#4A423C;padding:7.5px 10px}
+.reg table.lines tr.band.note td{background:none;font-size:12.5px}
+.reg table.lines tr.sum td{border-bottom:0;padding-top:10px;font-weight:600}
+.reg table.lines tr.sum.grand td{color:#B84800;font-weight:700;font-size:15.63px;border-top:1.5px solid #14110F;padding-top:11.25px}
+.reg table.lines td.paycell{padding:0;border-bottom:0}
+.reg .two{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:22.5px;padding-top:15px;border-top:1px solid #E3DCD4}
+.reg .iban{font-size:15px;letter-spacing:.06em;font-weight:600;margin-top:3.75px}
+.reg .pair{white-space:nowrap}
+.reg .note{color:#857B72;font-size:12.5px;line-height:1.4;margin-top:3.75px}
+#header-html,#footer-html{font-family:Montserrat,sans-serif;color:#857B72}
+.hd2{display:flex;justify-content:space-between;align-items:center;padding:7.5px 0;border-bottom:2px solid #FF6700;white-space:nowrap;box-sizing:border-box;height:40px;overflow:hidden}
+.hd2 .wm2{height:22.5px;width:auto}
+.hd2 .seg{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:#857B72;font-weight:600}
+.hd2 .seg b{color:#14110F;letter-spacing:0;text-transform:none;font-size:13.75px}
+.wrapper:first-child .hd2{visibility:hidden}
+.fwrap{box-sizing:border-box;height:60px}
+.cont{text-align:right;font-size:12.5px;font-style:italic;height:17.5px;margin-bottom:12.5px;padding-right:3px}
+.foot{border-top:1px solid #E3DCD4;padding-top:12.5px;font-size:11.88px;display:flex;justify-content:space-between;white-space:nowrap}
+</style>
+
+<div id="header-html">
+	<div class="hd2"><img class="wm2" src="/assets/fab/images/fabricators-wordmark.png" alt=""><div class="seg"><b>Fattura {{ doc.name }}</b> · segue dalla pagina <span class="prev"></span><span class="page" style="display:none"></span></div></div>
+	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1;w.querySelector(".prev").textContent=String(p-1);});}).observe(document.documentElement,{childList:true,subtree:true});</script>
+</div>
+<div id="footer-html">
+	<div class="fwrap">
+		<div class="cont"></div>
+		<div class="foot"><div>{{ company.company_name | upper }} · P.IVA {{ (company.tax_id or "") | replace("IT", "") }}{% if company.website %} · {{ company.website | replace("https://", "") | replace("http://", "") }}{% endif %}{% if company.email %} · {{ company.email }}{% endif %}{% if company.phone_no %} · {{ company.phone_no }}{% endif %}</div><div>Pagina <span class="page"></span>/<span class="topage"></span></div></div>
+	</div>
+	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,t=parseInt(w.querySelector(".topage").textContent)||1;w.querySelector(".cont").textContent=p<t?"continua alla pagina "+(p+1):"";});}).observe(document.documentElement,{childList:true,subtree:true});</script>
+</div>
+
+<div class="reg">
+	<div class="hd">
+		<div><img class="wm" src="/assets/fab/images/fabricators-wordmark.png" alt="fabricators"><div class="tag">Progetti per la qualità della vita</div></div>
+		<div class="num">
+			<div class="n1">{% if doc.is_return %}Nota di credito{% else %}Fattura{% endif %}</div>
+			<div class="n2">{{ doc.name }}</div>
+			<div class="n3">{% if doc.docstatus == 0 %}Bozza, non ancora emessa{% elif doc.docstatus == 2 %}Annullata{% elif doc.get("fab_edi_transmission_date") %}Copia di cortesia · SdI {{ frappe.utils.formatdate(doc.fab_edi_transmission_date, "dd/mm/yyyy") }}{% else %}Copia di cortesia{% endif %}</div>
+		</div>
+	</div>
+	<div class="rail">
+		<div>
+			<div class="lbl">Cliente</div>
+			<div class="v">{{ doc.customer_name | upper }}</div>
+			<div class="small">{% if address %}{{ address.address_line1 | upper }}{% if address.address_line2 %} {{ address.address_line2 | upper }}{% endif %}, {{ address.pincode or "" }} {{ (address.city or "") | upper }}{% if address.state %} ({{ address.state | upper }}){% endif %}{% if address.country and address.country != "Italy" %}, {{ address.country }}{% endif %}{% endif %}{% if doc.tax_id %} · P.IVA {{ doc.tax_id }}{% endif %}{% if doc.get("customer_fiscal_code") and doc.customer_fiscal_code != doc.tax_id %} · C.F. {{ doc.customer_fiscal_code }}{% endif %}</div>
+		</div>
+		<div>
+			<div class="lbl">Data</div><div class="v">{{ frappe.utils.formatdate(doc.posting_date, "dd/mm/yyyy") }}</div>
+			<div class="lbl">Scadenza</div><div class="v">{{ frappe.utils.formatdate(doc.due_date or doc.posting_date, "dd/mm/yyyy") }}</div>
+		</div>
+		<div>
+			<div class="lbl">Pagamento</div><div class="v">{{ payment }}</div>
+			<div class="lbl">Totale</div><div class="v" style="color:#B84800">{{ money(doc.grand_total) }} €</div>
+		</div>
+	</div>
+
+	<table class="lines">
+		<thead><tr><th style="width:52%">Descrizione</th><th class="n">Q.tà</th><th class="n">Netto</th><th class="n">Sconto</th><th class="n">IVA</th><th class="n">Importo</th></tr></thead>
+		<tbody>
+			{%- for item in doc.items[:split_at] %}{{ line(item) }}{% endfor %}
+		</tbody>
+		<tbody class="closing">
+			{%- for item in doc.items[split_at:] %}{{ line(item) }}{% endfor %}
+			<tr class="sum"><td colspan="5" class="n">Imponibile</td><td class="n">{{ money(doc.net_total) }} €</td></tr>
+			{%- for tax in doc.taxes %}
+			<tr class="sum"><td colspan="5" class="n">IVA {{ tax.description }}</td><td class="n">{{ money(tax.tax_amount) }} €</td></tr>
+			{%- endfor %}
+			{%- if doc.discount_amount %}<tr class="sum"><td colspan="5" class="n">Sconto</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>{% endif %}
+			<tr class="sum grand"><td colspan="5" class="n">Totale</td><td class="n">{{ money(doc.grand_total) }} €</td></tr>
+			<tr><td colspan="6" class="paycell">
+				<div class="two">
+					<div>
+						<div class="lbl">{{ payment.split(" ")[0] }}{% if bank %} · {{ bank.bank | title }}{% endif %}</div>
+						{%- if bank and bank.iban %}
+						{%- set iban = bank.iban | replace(" ", "") %}
+						<div class="iban">{% for i in range(0, iban|length, 4) %}{{ iban[i:i+4] }} {% endfor %}</div>
+						{%- endif %}
+						{%- if bic %}<div class="pair">BIC <b>{{ bic }}</b></div>{% endif %}
+						<div class="pair">Causale <b>{{ doc.name }}</b></div>
+					</div>
+					<div>
+						<div class="lbl">Note</div>
+						<div class="note">{{ note | replace("\n", "<br>") }}</div>
+					</div>
+				</div>
+			</td></tr>
+		</tbody>
+	</table>
+</div>
