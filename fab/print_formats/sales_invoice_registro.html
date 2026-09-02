@@ -49,9 +49,32 @@
 	{%- if item.get("fab_note") %}<tr class="band note"><td colspan="6">{{ item.fab_note | striptags | replace("\n", "<br>") }}</td></tr>{% endif -%}
 {%- endmacro -%}
 
+<script>
+/* Browser preview only (/printview, also inside the Print page iframe). The Chrome PDF generator
+   loads the site root and renders with Montserrat installed as a system font: no @font-face there,
+   it breaks text extraction. The browser gets the webfont, paper margins and a repeating footer. */
+(function(){
+	if (!/^\/printview/.test(location.pathname)) return;
+	var s = document.createElement("style");
+	s.textContent = [
+		'@font-face{font-family:Montserrat;font-weight:400;src:url(/assets/fab/fonts/Montserrat-Regular.ttf) format("truetype")}',
+		'@font-face{font-family:Montserrat;font-weight:600;src:url(/assets/fab/fonts/Montserrat-SemiBold.ttf) format("truetype")}',
+		'@font-face{font-family:Montserrat;font-weight:700;src:url(/assets/fab/fonts/Montserrat-Bold.ttf) format("truetype")}',
+		'@page{size:A4;margin:0}',
+		'@media print{.print-format-gutter .print-format{margin:0!important;padding:12mm 12mm 26mm!important;max-width:none!important}',
+		'#footer-html{display:block!important;position:fixed;bottom:0;left:0;right:0;padding:0 12mm 8mm;background:#fff}',
+		'#footer-html .cont,#footer-html .foot>div:last-child{display:none}}'
+	].join("\n");
+	document.head.appendChild(s);
+})();
+</script>
 <style>
+/* PDF-only blocks: the Chrome generator lifts their children into separate header/footer pages */
+#header-html,#footer-html{display:none}
 .print-format{margin-top:4mm;margin-bottom:5mm;margin-left:12mm;margin-right:12mm;page-size:A4;header-spacing:2}
-div.print-format{margin:0!important;padding:0!important;max-width:none!important;min-height:0!important;font-family:Montserrat,sans-serif!important;font-size:13.75px!important;color:#14110F!important;line-height:1.45!important}
+div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!important;color:#14110F!important;line-height:1.45!important}
+/* PDF: page margins come from the options above, the wrapper must not add its own */
+@media print{div.print-format{margin:0!important;padding:0!important;max-width:none!important;min-height:0!important}}
 .reg{font-family:Montserrat,sans-serif;font-size:13.75px;color:#14110F;line-height:1.45}
 .reg *{box-sizing:border-box}
 .reg .hd{display:grid;grid-template-columns:1fr auto;gap:30px;align-items:end}
