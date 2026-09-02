@@ -5,11 +5,11 @@
 {%- set bank = bank_accounts[0] if bank_accounts else None -%}
 {%- set bic = frappe.db.get_value("Bank", bank.bank, "swift_number") if bank else None -%}
 {%- set address = frappe.get_doc("Address", doc.customer_address) if doc.customer_address else None -%}
-{%- set payment = doc.payment_terms_template or "Bonifico bancario" -%}
+{%- set payment = doc.payment_terms_template or _("Bank transfer", context="invoice") -%}
 {%- set closing_rows = 2 if doc.items|length > 2 else 0 -%}
 {%- set split_at = doc.items|length - closing_rows -%}
 {%- set plain_uoms = ["NR", "Nos", "Unit", "Pz", "PZ"] -%}
-{%- set note = (doc.terms | striptags | trim) if doc.terms else ("Proforma: non valida ai fini fiscali, la fattura elettronica viene trasmessa allo SdI all'emissione." if doc.docstatus == 0 else "Copia di cortesia: fa fede l'XML trasmesso allo SdI.") -%}
+{%- set note = (doc.terms | striptags | trim) if doc.terms else (_("Proforma: not valid for tax purposes, the electronic invoice is sent to the SdI on issue.", context="invoice") if doc.docstatus == 0 else _("Courtesy copy: the XML sent to the SdI is the legal document.", context="invoice")) -%}
 
 {%- macro money(v) -%}{{ frappe.utils.fmt_money(v, 2) }}{%- endmacro -%}
 {%- macro qty(item) -%}
@@ -25,7 +25,7 @@
 {%- endmacro -%}
 {%- macro tax_label(tax) -%}
 	{%- set d = (tax.description or "") | striptags | trim -%}
-	{%- if d | lower | truncate(3, true, "") == "iva" %}{{ d }}{% else %}IVA {{ d }}{% endif -%}
+	{%- if d | lower | truncate(3, true, "") == "iva" %}{{ d }}{% else %}{{ _("VAT", context="invoice") }} {{ d }}{% endif -%}
 {%- endmacro -%}
 {%- macro line(item) -%}
 	{%- if item.get("fab_section") %}<tr class="band"><td colspan="6">{{ item.fab_section }}</td></tr>{% endif -%}
@@ -129,69 +129,69 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 </style>
 
 <div id="header-html">
-	<div class="hd2"><img class="wm2" src="/assets/fab/images/fabricators-wordmark.png" alt=""><div class="seg"><b>{{ "Proforma" if doc.docstatus == 0 else "Fattura" }} {{ doc.name }}</b> · segue dalla pagina <span class="prev"></span><span class="page" style="display:none"></span></div></div>
+	<div class="hd2"><img class="wm2" src="/assets/fab/images/fabricators-wordmark.png" alt=""><div class="seg"><b>{{ _("Proforma", context="invoice") if doc.docstatus == 0 else _("Invoice", context="invoice") }} {{ doc.name }}</b> · <span class="segl">{{ _("continued from page", context="invoice") }}</span> <span class="prev"></span><span class="page" style="display:none"></span></div></div>
 	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,v=String(p-1),el=w.querySelector(".prev");if(el.textContent!==v)el.textContent=v;});}).observe(document.documentElement,{childList:true,subtree:true});</script>
 </div>
 <div id="footer-html">
 	<div class="fwrap">
-		<div class="cont"></div>
-		<div class="foot"><div>{{ company.company_name | upper }} · P.IVA {{ (company.tax_id or "") | replace("IT", "") }}{% if company.website %} · {{ company.website | replace("https://", "") | replace("http://", "") }}{% endif %}{% if company.email %} · {{ company.email }}{% endif %}{% if company.phone_no %} · {{ company.phone_no }}{% endif %}</div><div>Pagina <span class="page"></span>/<span class="topage"></span></div></div>
+		<div class="cont" data-label="{{ _("continues on page", context="invoice") }}"></div>
+		<div class="foot"><div>{{ company.company_name | upper }} · {{ _("VAT no.", context="invoice") }} {{ (company.tax_id or "") | replace("IT", "") }}{% if company.website %} · {{ company.website | replace("https://", "") | replace("http://", "") }}{% endif %}{% if company.email %} · {{ company.email }}{% endif %}{% if company.phone_no %} · {{ company.phone_no }}{% endif %}</div><div>{{ _("Page", context="invoice") }} <span class="page"></span>/<span class="topage"></span></div></div>
 	</div>
-	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,t=parseInt(w.querySelector(".topage").textContent)||1,v=p<t?"continua alla pagina "+(p+1):"",el=w.querySelector(".cont");if(el.textContent!==v)el.textContent=v;});}).observe(document.documentElement,{childList:true,subtree:true});</script>
+	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,t=parseInt(w.querySelector(".topage").textContent)||1,el=w.querySelector(".cont"),v=p<t?el.getAttribute("data-label")+" "+(p+1):"";if(el.textContent!==v)el.textContent=v;});}).observe(document.documentElement,{childList:true,subtree:true});</script>
 </div>
 
 <div class="reg">
 	<div class="hd">
 		<div><img class="wm" src="/assets/fab/images/fabricators-wordmark.png" alt="fabricators"><div class="tag">Progetti per la qualità della vita</div></div>
 		<div class="num">
-			<div class="n1">{% if doc.docstatus == 0 %}Proforma{% elif doc.is_return %}Nota di credito{% else %}Fattura{% endif %}</div>
+			<div class="n1">{% if doc.docstatus == 0 %}{{ _("Proforma", context="invoice") }}{% elif doc.is_return %}{{ _("Credit note", context="invoice") }}{% else %}{{ _("Invoice", context="invoice") }}{% endif %}</div>
 			<div class="n2">{{ doc.name }}</div>
-			<div class="n3">{% if doc.docstatus == 0 %}Non valida ai fini fiscali{% elif doc.docstatus == 2 %}Annullata{% elif doc.get("fab_edi_transmission_date") %}Copia di cortesia · SdI {{ frappe.utils.formatdate(doc.fab_edi_transmission_date, "dd/mm/yyyy") }}{% else %}Copia di cortesia{% endif %}</div>
+			<div class="n3">{% if doc.docstatus == 0 %}{{ _("Not valid for tax purposes", context="invoice") }}{% elif doc.docstatus == 2 %}{{ _("Cancelled", context="invoice") }}{% elif doc.get("fab_edi_transmission_date") %}{{ _("Courtesy copy", context="invoice") }} · SdI {{ frappe.utils.formatdate(doc.fab_edi_transmission_date, "dd/mm/yyyy") }}{% else %}{{ _("Courtesy copy", context="invoice") }}{% endif %}</div>
 		</div>
 	</div>
 	<div class="rail">
 		<div>
-			<div class="lbl">Cliente</div>
+			<div class="lbl">{{ _("Customer", context="invoice") }}</div>
 			<div class="v">{{ doc.customer_name | upper }}</div>
-			<div class="small">{% if address %}{{ address.address_line1 | upper }}{% if address.address_line2 %} {{ address.address_line2 | upper }}{% endif %}, {{ address.pincode or "" }} {{ (address.city or "") | upper }}{% if address.state %} ({{ address.state | upper }}){% endif %}{% if address.country and address.country != "Italy" %}, {{ address.country }}{% endif %}{% endif %}{% if doc.tax_id %} · P.IVA {{ doc.tax_id }}{% endif %}{% if doc.get("customer_fiscal_code") and doc.customer_fiscal_code != doc.tax_id %} · C.F. {{ doc.customer_fiscal_code }}{% endif %}</div>
+			<div class="small">{% if address %}{{ address.address_line1 | upper }}{% if address.address_line2 %} {{ address.address_line2 | upper }}{% endif %}, {{ address.pincode or "" }} {{ (address.city or "") | upper }}{% if address.state %} ({{ address.state | upper }}){% endif %}{% if address.country and address.country != "Italy" %}, {{ address.country }}{% endif %}{% endif %}{% if doc.tax_id %} · {{ _("VAT no.", context="invoice") }} {{ doc.tax_id }}{% endif %}{% if doc.get("customer_fiscal_code") and doc.customer_fiscal_code != doc.tax_id %} · {{ _("Tax code", context="invoice") }} {{ doc.customer_fiscal_code }}{% endif %}</div>
 		</div>
 		<div>
-			<div class="lbl">Data</div><div class="v">{{ frappe.utils.formatdate(doc.posting_date, "dd/mm/yyyy") }}</div>
-			<div class="lbl">Scadenza</div><div class="v">{{ frappe.utils.formatdate(doc.due_date or doc.posting_date, "dd/mm/yyyy") }}</div>
+			<div class="lbl">{{ _("Date", context="invoice") }}</div><div class="v">{{ frappe.utils.formatdate(doc.posting_date, "dd/mm/yyyy") }}</div>
+			<div class="lbl">{{ _("Due date", context="invoice") }}</div><div class="v">{{ frappe.utils.formatdate(doc.due_date or doc.posting_date, "dd/mm/yyyy") }}</div>
 		</div>
 		<div>
-			<div class="lbl">Pagamento</div><div class="v">{{ payment }}</div>
-			<div class="lbl">Totale</div><div class="v" style="color:#B84800">{{ money(doc.grand_total) }} €</div>
+			<div class="lbl">{{ _("Payment", context="invoice") }}</div><div class="v">{{ payment }}</div>
+			<div class="lbl">{{ _("Total", context="invoice") }}</div><div class="v" style="color:#B84800">{{ money(doc.grand_total) }} €</div>
 		</div>
 	</div>
 
 	<table class="lines">
-		<thead><tr><th style="width:52%">Descrizione</th><th class="n">Q.tà</th><th class="n">Netto</th><th class="n">Sconto</th><th class="n">IVA</th><th class="n">Importo</th></tr></thead>
+		<thead><tr><th style="width:52%">{{ _("Description", context="invoice") }}</th><th class="n">{{ _("Qty", context="invoice") }}</th><th class="n">{{ _("Net", context="invoice") }}</th><th class="n">{{ _("Discount", context="invoice") }}</th><th class="n">{{ _("VAT", context="invoice") }}</th><th class="n">{{ _("Amount", context="invoice") }}</th></tr></thead>
 		<tbody>
 			{%- for item in doc.items[:split_at] %}{{ line(item) }}{% endfor %}
 		</tbody>
 		<tbody class="closing">
 			{%- for item in doc.items[split_at:] %}{{ line(item) }}{% endfor %}
-			<tr class="sum"><td colspan="5" class="n">Imponibile</td><td class="n">{{ money(doc.net_total) }} €</td></tr>
+			<tr class="sum"><td colspan="5" class="n">{{ _("Taxable amount", context="invoice") }}</td><td class="n">{{ money(doc.net_total) }} €</td></tr>
 			{%- for tax in doc.taxes %}
 			<tr class="sum"><td colspan="5" class="n">{{ tax_label(tax) }}</td><td class="n">{{ money(tax.tax_amount) }} €</td></tr>
 			{%- endfor %}
 			{#- a discount on the net total is already inside Imponibile; only a grand-total discount is a separate step -#}
-			{%- if doc.discount_amount and doc.apply_discount_on == "Grand Total" %}<tr class="sum"><td colspan="5" class="n">Sconto</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>{% endif %}
-			<tr class="sum grand"><td colspan="5" class="n">Totale</td><td class="n">{{ money(doc.grand_total) }} €</td></tr>
+			{%- if doc.discount_amount and doc.apply_discount_on == "Grand Total" %}<tr class="sum"><td colspan="5" class="n">{{ _("Discount", context="invoice") }}</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>{% endif %}
+			<tr class="sum grand"><td colspan="5" class="n">{{ _("Total", context="invoice") }}</td><td class="n">{{ money(doc.grand_total) }} €</td></tr>
 			<tr><td colspan="6" class="paycell">
 				<div class="two">
 					<div>
-						<div class="lbl">{{ "Bonifico" if not doc.payment_terms_template else payment }}{% if bank %} · {{ bank.bank | title }}{% endif %}</div>
+						<div class="lbl">{{ _("Transfer", context="invoice") if not doc.payment_terms_template else payment }}{% if bank %} · {{ bank.bank | title }}{% endif %}</div>
 						{%- if bank and bank.iban %}
 						{%- set iban = bank.iban | replace(" ", "") %}
 						<div class="iban">{% for i in range(0, iban|length, 4) %}{{ iban[i:i+4] }} {% endfor %}</div>
 						{%- endif %}
 						{%- if bic %}<div class="pair">BIC <b>{{ bic }}</b></div>{% endif %}
-						<div class="pair">Causale <b>{{ doc.name }}</b></div>
+						<div class="pair">{{ _("Reference", context="invoice") }} <b>{{ doc.name }}</b></div>
 					</div>
 					<div>
-						<div class="lbl">Note</div>
+						<div class="lbl">{{ _("Notes", context="invoice") }}</div>
 						<div class="note">{{ note | replace("\n", "<br>") }}</div>
 					</div>
 				</div>

@@ -1,0 +1,125 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: fab\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Sales invoice print format
+
+msgctxt "invoice"
+msgid "Invoice"
+msgstr "Facture"
+
+msgctxt "invoice"
+msgid "Proforma"
+msgstr "Proforma"
+
+msgctxt "invoice"
+msgid "Credit note"
+msgstr "Avoir"
+
+msgctxt "invoice"
+msgid "Not valid for tax purposes"
+msgstr "Sans valeur fiscale"
+
+msgctxt "invoice"
+msgid "Cancelled"
+msgstr "Annulée"
+
+msgctxt "invoice"
+msgid "Courtesy copy"
+msgstr "Copie de courtoisie"
+
+msgctxt "invoice"
+msgid "Customer"
+msgstr "Client"
+
+msgctxt "invoice"
+msgid "VAT no."
+msgstr "N° TVA"
+
+msgctxt "invoice"
+msgid "Tax code"
+msgstr "Code fiscal"
+
+msgctxt "invoice"
+msgid "Date"
+msgstr "Date"
+
+msgctxt "invoice"
+msgid "Due date"
+msgstr "Échéance"
+
+msgctxt "invoice"
+msgid "Payment"
+msgstr "Paiement"
+
+msgctxt "invoice"
+msgid "Total"
+msgstr "Total"
+
+msgctxt "invoice"
+msgid "Description"
+msgstr "Description"
+
+msgctxt "invoice"
+msgid "Qty"
+msgstr "Qté"
+
+msgctxt "invoice"
+msgid "Net"
+msgstr "Net"
+
+msgctxt "invoice"
+msgid "Discount"
+msgstr "Remise"
+
+msgctxt "invoice"
+msgid "VAT"
+msgstr "TVA"
+
+msgctxt "invoice"
+msgid "Amount"
+msgstr "Montant"
+
+msgctxt "invoice"
+msgid "Taxable amount"
+msgstr "Base imposable"
+
+msgctxt "invoice"
+msgid "Bank transfer"
+msgstr "Virement bancaire"
+
+msgctxt "invoice"
+msgid "Transfer"
+msgstr "Virement"
+
+msgctxt "invoice"
+msgid "Reference"
+msgstr "Référence"
+
+msgctxt "invoice"
+msgid "Notes"
+msgstr "Notes"
+
+msgctxt "invoice"
+msgid "Courtesy copy: the XML sent to the SdI is the legal document."
+msgstr "Copie de courtoisie : seul le XML transmis au SdI fait foi."
+
+msgctxt "invoice"
+msgid "Proforma: not valid for tax purposes, the electronic invoice is sent to the SdI on issue."
+msgstr "Proforma : sans valeur fiscale, la facture électronique est transmise au SdI à l'émission."
+
+msgctxt "invoice"
+msgid "Page"
+msgstr "Page"
+
+msgctxt "invoice"
+msgid "continues on page"
+msgstr "suite à la page"
+
+msgctxt "invoice"
+msgid "continued from page"
+msgstr "suite de la page"

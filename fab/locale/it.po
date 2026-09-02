@@ -1,0 +1,125 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: fab\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Sales invoice print format
+
+msgctxt "invoice"
+msgid "Invoice"
+msgstr "Fattura"
+
+msgctxt "invoice"
+msgid "Proforma"
+msgstr "Proforma"
+
+msgctxt "invoice"
+msgid "Credit note"
+msgstr "Nota di credito"
+
+msgctxt "invoice"
+msgid "Not valid for tax purposes"
+msgstr "Non valida ai fini fiscali"
+
+msgctxt "invoice"
+msgid "Cancelled"
+msgstr "Annullata"
+
+msgctxt "invoice"
+msgid "Courtesy copy"
+msgstr "Copia di cortesia"
+
+msgctxt "invoice"
+msgid "Customer"
+msgstr "Cliente"
+
+msgctxt "invoice"
+msgid "VAT no."
+msgstr "P.IVA"
+
+msgctxt "invoice"
+msgid "Tax code"
+msgstr "C.F."
+
+msgctxt "invoice"
+msgid "Date"
+msgstr "Data"
+
+msgctxt "invoice"
+msgid "Due date"
+msgstr "Scadenza"
+
+msgctxt "invoice"
+msgid "Payment"
+msgstr "Pagamento"
+
+msgctxt "invoice"
+msgid "Total"
+msgstr "Totale"
+
+msgctxt "invoice"
+msgid "Description"
+msgstr "Descrizione"
+
+msgctxt "invoice"
+msgid "Qty"
+msgstr "Q.tà"
+
+msgctxt "invoice"
+msgid "Net"
+msgstr "Netto"
+
+msgctxt "invoice"
+msgid "Discount"
+msgstr "Sconto"
+
+msgctxt "invoice"
+msgid "VAT"
+msgstr "IVA"
+
+msgctxt "invoice"
+msgid "Amount"
+msgstr "Importo"
+
+msgctxt "invoice"
+msgid "Taxable amount"
+msgstr "Imponibile"
+
+msgctxt "invoice"
+msgid "Bank transfer"
+msgstr "Bonifico bancario"
+
+msgctxt "invoice"
+msgid "Transfer"
+msgstr "Bonifico"
+
+msgctxt "invoice"
+msgid "Reference"
+msgstr "Causale"
+
+msgctxt "invoice"
+msgid "Notes"
+msgstr "Note"
+
+msgctxt "invoice"
+msgid "Courtesy copy: the XML sent to the SdI is the legal document."
+msgstr "Copia di cortesia: fa fede l'XML trasmesso allo SdI."
+
+msgctxt "invoice"
+msgid "Proforma: not valid for tax purposes, the electronic invoice is sent to the SdI on issue."
+msgstr "Proforma: non valida ai fini fiscali, la fattura elettronica viene trasmessa allo SdI all'emissione."
+
+msgctxt "invoice"
+msgid "Page"
+msgstr "Pagina"
+
+msgctxt "invoice"
+msgid "continues on page"
+msgstr "continua alla pagina"
+
+msgctxt "invoice"
+msgid "continued from page"
+msgstr "segue dalla pagina"
