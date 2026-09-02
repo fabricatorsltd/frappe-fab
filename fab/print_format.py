@@ -180,6 +180,9 @@ def get_pdf(print_format, html, options, output, pdf_generator=None):
 		return None
 	from frappe.utils.pdf import get_chrome_pdf
 
+	# workers under supervisor start without HOME and fontconfig then skips the
+	# user font directory where ensure_system_fonts() put Montserrat
+	os.environ.setdefault("HOME", os.path.expanduser("~"))
 	pdf = get_chrome_pdf(print_format, html, options, output, pdf_generator="chrome")
 	if output is not None or not isinstance(pdf, bytes):
 		return pdf

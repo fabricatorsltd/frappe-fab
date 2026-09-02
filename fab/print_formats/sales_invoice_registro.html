@@ -9,7 +9,7 @@
 {%- set closing_rows = 2 if doc.items|length > 2 else 0 -%}
 {%- set split_at = doc.items|length - closing_rows -%}
 {%- set plain_uoms = ["NR", "Nos", "Unit", "Pz", "PZ"] -%}
-{%- set note = (doc.terms | striptags | trim) if doc.terms else "Copia di cortesia: fa fede l'XML trasmesso allo SdI." -%}
+{%- set note = (doc.terms | striptags | trim) if doc.terms else ("Proforma: non valida ai fini fiscali, la fattura elettronica viene trasmessa allo SdI all'emissione." if doc.docstatus == 0 else "Copia di cortesia: fa fede l'XML trasmesso allo SdI.") -%}
 
 {%- macro money(v) -%}{{ frappe.utils.fmt_money(v, 2) }}{%- endmacro -%}
 {%- macro qty(item) -%}
@@ -129,7 +129,7 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 </style>
 
 <div id="header-html">
-	<div class="hd2"><img class="wm2" src="/assets/fab/images/fabricators-wordmark.png" alt=""><div class="seg"><b>Fattura {{ doc.name }}</b> · segue dalla pagina <span class="prev"></span><span class="page" style="display:none"></span></div></div>
+	<div class="hd2"><img class="wm2" src="/assets/fab/images/fabricators-wordmark.png" alt=""><div class="seg"><b>{{ "Proforma" if doc.docstatus == 0 else "Fattura" }} {{ doc.name }}</b> · segue dalla pagina <span class="prev"></span><span class="page" style="display:none"></span></div></div>
 	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,v=String(p-1),el=w.querySelector(".prev");if(el.textContent!==v)el.textContent=v;});}).observe(document.documentElement,{childList:true,subtree:true});</script>
 </div>
 <div id="footer-html">
@@ -144,9 +144,9 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 	<div class="hd">
 		<div><img class="wm" src="/assets/fab/images/fabricators-wordmark.png" alt="fabricators"><div class="tag">Progetti per la qualità della vita</div></div>
 		<div class="num">
-			<div class="n1">{% if doc.is_return %}Nota di credito{% else %}Fattura{% endif %}</div>
+			<div class="n1">{% if doc.docstatus == 0 %}Proforma{% elif doc.is_return %}Nota di credito{% else %}Fattura{% endif %}</div>
 			<div class="n2">{{ doc.name }}</div>
-			<div class="n3">{% if doc.docstatus == 0 %}Bozza, non ancora emessa{% elif doc.docstatus == 2 %}Annullata{% elif doc.get("fab_edi_transmission_date") %}Copia di cortesia · SdI {{ frappe.utils.formatdate(doc.fab_edi_transmission_date, "dd/mm/yyyy") }}{% else %}Copia di cortesia{% endif %}</div>
+			<div class="n3">{% if doc.docstatus == 0 %}Non valida ai fini fiscali{% elif doc.docstatus == 2 %}Annullata{% elif doc.get("fab_edi_transmission_date") %}Copia di cortesia · SdI {{ frappe.utils.formatdate(doc.fab_edi_transmission_date, "dd/mm/yyyy") }}{% else %}Copia di cortesia{% endif %}</div>
 		</div>
 	</div>
 	<div class="rail">
