@@ -142,7 +142,7 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 
 <div class="reg">
 	<div class="hd">
-		<div><img class="wm" src="/assets/fab/images/fabricators-wordmark.png" alt="fabricators"><div class="tag">Progetti per la qualità della vita</div></div>
+		<div><img class="wm" src="/assets/fab/images/fabricators-wordmark.png" alt="fabricators"><div class="tag">{{ _("Progetti per la qualità della vita", context="tagline") }}</div></div>
 		<div class="num">
 			<div class="n1">{% if doc.docstatus == 0 %}{{ _("Proforma", context="invoice") }}{% elif doc.is_return %}{{ _("Credit note", context="invoice") }}{% else %}{{ _("Invoice", context="invoice") }}{% endif %}</div>
 			<div class="n2">{{ doc.name }}</div>
