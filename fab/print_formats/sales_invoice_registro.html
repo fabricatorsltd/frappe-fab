@@ -18,9 +18,14 @@
 {%- endmacro -%}
 {%- macro pct(v) -%}{{ (v|int if v == v|int else v)|string }}%{%- endmacro -%}
 {%- macro vat_rate(item) -%}
+	{#- per-line rate when the Italian tax field carries one, else the document average (single-rate invoices) -#}
 	{%- if item.get("tax_rate") -%}{{ pct(item.tax_rate) }}
-	{%- elif doc.net_total -%}{{ pct((doc.total_taxes_and_charges / doc.net_total * 100)|round(0)) }}
+	{%- elif doc.net_total and doc.total_taxes_and_charges -%}{{ pct((doc.total_taxes_and_charges / doc.net_total * 100)|round(0)) }}
 	{%- else -%}0%{%- endif -%}
+{%- endmacro -%}
+{%- macro tax_label(tax) -%}
+	{%- set d = (tax.description or "") | striptags | trim -%}
+	{%- if d | lower | truncate(3, true, "") == "iva" %}{{ d }}{% else %}IVA {{ d }}{% endif -%}
 {%- endmacro -%}
 {%- macro line(item) -%}
 	{%- if item.get("fab_section") %}<tr class="band"><td colspan="6">{{ item.fab_section }}</td></tr>{% endif -%}
@@ -75,6 +80,8 @@
 div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!important;color:#14110F!important;line-height:1.45!important}
 /* PDF: page margins come from the options above, the wrapper must not add its own */
 @media print{div.print-format{margin:0!important;padding:0!important;max-width:none!important;min-height:0!important}}
+/* browser preview: same paper margins as the PDF instead of Frappe's wide default padding */
+@media screen{.print-format-gutter .print-format{padding:10mm 12mm!important}}
 .reg{font-family:Montserrat,sans-serif;font-size:13.75px;color:#14110F;line-height:1.45}
 .reg *{box-sizing:border-box}
 .reg .hd{display:grid;grid-template-columns:1fr auto;gap:30px;align-items:end}
@@ -120,14 +127,14 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 
 <div id="header-html">
 	<div class="hd2"><img class="wm2" src="/assets/fab/images/fabricators-wordmark.png" alt=""><div class="seg"><b>Fattura {{ doc.name }}</b> · segue dalla pagina <span class="prev"></span><span class="page" style="display:none"></span></div></div>
-	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1;w.querySelector(".prev").textContent=String(p-1);});}).observe(document.documentElement,{childList:true,subtree:true});</script>
+	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,v=String(p-1),el=w.querySelector(".prev");if(el.textContent!==v)el.textContent=v;});}).observe(document.documentElement,{childList:true,subtree:true});</script>
 </div>
 <div id="footer-html">
 	<div class="fwrap">
 		<div class="cont"></div>
 		<div class="foot"><div>{{ company.company_name | upper }} · P.IVA {{ (company.tax_id or "") | replace("IT", "") }}{% if company.website %} · {{ company.website | replace("https://", "") | replace("http://", "") }}{% endif %}{% if company.email %} · {{ company.email }}{% endif %}{% if company.phone_no %} · {{ company.phone_no }}{% endif %}</div><div>Pagina <span class="page"></span>/<span class="topage"></span></div></div>
 	</div>
-	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,t=parseInt(w.querySelector(".topage").textContent)||1;w.querySelector(".cont").textContent=p<t?"continua alla pagina "+(p+1):"";});}).observe(document.documentElement,{childList:true,subtree:true});</script>
+	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,t=parseInt(w.querySelector(".topage").textContent)||1,v=p<t?"continua alla pagina "+(p+1):"",el=w.querySelector(".cont");if(el.textContent!==v)el.textContent=v;});}).observe(document.documentElement,{childList:true,subtree:true});</script>
 </div>
 
 <div class="reg">
@@ -164,14 +171,15 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 			{%- for item in doc.items[split_at:] %}{{ line(item) }}{% endfor %}
 			<tr class="sum"><td colspan="5" class="n">Imponibile</td><td class="n">{{ money(doc.net_total) }} €</td></tr>
 			{%- for tax in doc.taxes %}
-			<tr class="sum"><td colspan="5" class="n">IVA {{ tax.description }}</td><td class="n">{{ money(tax.tax_amount) }} €</td></tr>
+			<tr class="sum"><td colspan="5" class="n">{{ tax_label(tax) }}</td><td class="n">{{ money(tax.tax_amount) }} €</td></tr>
 			{%- endfor %}
-			{%- if doc.discount_amount %}<tr class="sum"><td colspan="5" class="n">Sconto</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>{% endif %}
+			{#- a discount on the net total is already inside Imponibile; only a grand-total discount is a separate step -#}
+			{%- if doc.discount_amount and doc.apply_discount_on == "Grand Total" %}<tr class="sum"><td colspan="5" class="n">Sconto</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>{% endif %}
 			<tr class="sum grand"><td colspan="5" class="n">Totale</td><td class="n">{{ money(doc.grand_total) }} €</td></tr>
 			<tr><td colspan="6" class="paycell">
 				<div class="two">
 					<div>
-						<div class="lbl">{{ payment.split(" ")[0] }}{% if bank %} · {{ bank.bank | title }}{% endif %}</div>
+						<div class="lbl">{{ "Bonifico" if not doc.payment_terms_template else payment }}{% if bank %} · {{ bank.bank | title }}{% endif %}</div>
 						{%- if bank and bank.iban %}
 						{%- set iban = bank.iban | replace(" ", "") %}
 						<div class="iban">{% for i in range(0, iban|length, 4) %}{{ iban[i:i+4] }} {% endfor %}</div>

@@ -18,9 +18,34 @@ BANK_BIC = {"BANCA SELLA SPA": "SELBIT2BXXX"}
 
 
 def ensure_all():
+	if not frappe.db.exists("DocType", "Sales Invoice"):
+		return
 	ensure_invoice_line_fields()
 	ensure_company_billing_data()
+	ensure_system_fonts()
 	ensure_sales_invoice_print_format()
+
+
+def ensure_system_fonts():
+	"""The Chrome PDF generator only renders a font reliably when it is
+	installed on the host (web fonts are not awaited before printing), so the
+	bundled Montserrat files are copied into the user font directory."""
+	import shutil
+	import subprocess
+
+	src = os.path.join(os.path.dirname(__file__), "public", "fonts")
+	dst = os.path.expanduser("~/.local/share/fonts")
+	changed = False
+	for name in os.listdir(src):
+		if not name.endswith(".ttf"):
+			continue
+		target = os.path.join(dst, name)
+		if not os.path.exists(target) or os.path.getsize(target) != os.path.getsize(os.path.join(src, name)):
+			os.makedirs(dst, exist_ok=True)
+			shutil.copy2(os.path.join(src, name), target)
+			changed = True
+	if changed and shutil.which("fc-cache"):
+		subprocess.run(["fc-cache", "-f"], check=False, capture_output=True)
 
 
 def ensure_invoice_line_fields():
@@ -66,7 +91,9 @@ def ensure_invoice_line_fields():
 
 
 def ensure_company_billing_data():
-	for company in frappe.get_all("Company", fields=["name", "email", "phone_no", "website"]):
+	for company in frappe.get_all(
+		"Company", filters={"company_name": ["like", "FABRICATORS%"]}, fields=["name", "email", "phone_no", "website"]
+	):
 		values = {k: v for k, v in COMPANY_CONTACTS.items() if not company.get(k)}
 		if values:
 			frappe.db.set_value("Company", company.name, values, update_modified=False)
