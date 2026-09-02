@@ -219,6 +219,8 @@ doc_events = {
 # ----------------
 # PDF downloads without an explicit generator must follow the print format.
 before_request = ["fab.print_format.set_pdf_generator"]
+# "chrome_pdfa": Chrome render closed as PDF/A-2b (see fab.print_format.get_pdf)
+pdf_generator = "fab.print_format.get_pdf"
 # after_request = ["fab.utils.after_request"]
 
 # Job Events

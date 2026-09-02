@@ -54,6 +54,9 @@
 	{%- if item.get("fab_note") %}<tr class="band note"><td colspan="6">{{ item.fab_note | striptags | replace("\n", "<br>") }}</td></tr>{% endif -%}
 {%- endmacro -%}
 
+{#- PDF metadata, applied by the chrome_pdfa generator (fab.print_format.get_pdf) -#}
+<meta name="pdf-title" content="{{ doc.name | replace("/", "-") }}">
+<meta name="pdf-author" content="{{ company.company_name }}">
 <script>
 /* Browser preview only (/printview, also inside the Print page iframe). The Chrome PDF generator
    loads the site root and renders with Montserrat installed as a system font: no @font-face there,

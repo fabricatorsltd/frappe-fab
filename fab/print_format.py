@@ -5,6 +5,8 @@ import os
 import frappe
 
 PRINT_FORMAT = "Fattura FABRICATORS"
+PDF_GENERATOR = "chrome_pdfa"
+ICC_DIRS = ("/usr/share/color/icc/ghostscript", "/usr/share/ghostscript/iccprofiles", "/usr/share/color/icc")
 TEMPLATE = os.path.join(os.path.dirname(__file__), "print_formats", "sales_invoice_registro.html")
 
 # Company contact facts printed in the invoice footer; only filled when empty so
@@ -115,9 +117,20 @@ def ensure_sales_invoice_print_format():
 		"print_format_type": "Jinja",
 		"disabled": 0,
 		"default_print_language": "it",
-		"pdf_generator": "chrome",
+		"pdf_generator": PDF_GENERATOR,
 		"html": html,
 	}
+	frappe.make_property_setter(
+		{
+			"doctype": "Print Format",
+			"doctype_or_field": "DocField",
+			"fieldname": "pdf_generator",
+			"property": "options",
+			"value": "wkhtmltopdf\nchrome\n" + PDF_GENERATOR,
+			"property_type": "Text",
+		},
+		validate_fields_for_doctype=False,
+	)
 	if frappe.db.exists("Print Format", PRINT_FORMAT):
 		doc = frappe.get_doc("Print Format", PRINT_FORMAT)
 		if any(doc.get(k) != v for k, v in values.items()):
@@ -156,3 +169,81 @@ def set_pdf_generator():
 	generator = frappe.get_cached_value("Print Format", print_format, "pdf_generator")
 	if generator:
 		form.pdf_generator = generator
+
+
+def get_pdf(print_format, html, options, output, pdf_generator=None):
+	"""pdf_generator hook: "chrome_pdfa" renders with Frappe's Chrome generator
+	and then closes the file as PDF/A-2b with Ghostscript, carrying the title
+	and author the format declares in <meta name="pdf-title|pdf-author">.
+	Combined outputs (several documents in one writer) keep the plain PDF."""
+	if pdf_generator != PDF_GENERATOR:
+		return None
+	from frappe.utils.pdf import get_chrome_pdf
+
+	pdf = get_chrome_pdf(print_format, html, options, output, pdf_generator="chrome")
+	if output is not None or not isinstance(pdf, bytes):
+		return pdf
+	title = _meta(html, "pdf-title")
+	author = _meta(html, "pdf-author")
+	try:
+		return to_pdfa(pdf, title=title, author=author)
+	except Exception:
+		frappe.log_error("PDF/A conversion failed, plain PDF returned", "fab.print_format.get_pdf")
+		return pdf
+
+
+def _meta(html, name):
+	import html as html_module
+	import re
+
+	m = re.search(r'<meta\s+name="%s"\s+content="([^"]*)"' % re.escape(name), html)
+	return html_module.unescape(m.group(1)) if m else ""
+
+
+def _ps_string(value):
+	return "(" + (value or "").replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)") + ")"
+
+
+def to_pdfa(pdf, title="", author=""):
+	"""Rewrite a PDF as PDF/A-2b (sRGB output intent, XMP, embedded fonts)."""
+	import shutil
+	import subprocess
+	import tempfile
+
+	gs = shutil.which("gs")
+	if not gs:
+		raise RuntimeError("ghostscript is not installed")
+	icc = next(
+		(os.path.join(d, "srgb.icc") for d in ICC_DIRS if os.path.exists(os.path.join(d, "srgb.icc"))), None
+	)
+	if not icc:
+		raise RuntimeError("sRGB ICC profile not found")
+	with tempfile.TemporaryDirectory() as tmp:
+		src = os.path.join(tmp, "in.pdf")
+		dst = os.path.join(tmp, "out.pdf")
+		defs = os.path.join(tmp, "pdfa.ps")
+		with open(src, "wb") as f:
+			f.write(pdf)
+		with open(defs, "w") as f:
+			f.write(
+				"%!\n"
+				"[ /Title " + _ps_string(title) + " /Author " + _ps_string(author) + " /Creator (Frappe) /DOCINFO pdfmark\n"
+				"[/_objdef {icc_PDFA} /type /stream /OBJ pdfmark\n"
+				"[{icc_PDFA} << /N 3 >> /PUT pdfmark\n"
+				"[{icc_PDFA} " + _ps_string(icc) + " (r) file /PUT pdfmark\n"
+				"[/_objdef {OutputIntent_PDFA} /type /dict /OBJ pdfmark\n"
+				"[{OutputIntent_PDFA} << /Type /OutputIntent /S /GTS_PDFA1 /DestOutputProfile {icc_PDFA}"
+				" /OutputConditionIdentifier (sRGB IEC61966-2.1) /Info (sRGB IEC61966-2.1) >> /PUT pdfmark\n"
+				"[{Catalog} << /OutputIntents [ {OutputIntent_PDFA} ] >> /PUT pdfmark\n"
+			)
+		cmd = [
+			gs, "-q", "-dBATCH", "-dNOPAUSE", "-dNOOUTERSAVE", "-dPDFA=2", "-dPDFACompatibilityPolicy=1",
+			"--permit-file-read=" + os.path.dirname(icc) + "/", "-sDEVICE=pdfwrite",
+			"-sProcessColorModel=DeviceRGB", "-sColorConversionStrategy=RGB", "-dEmbedAllFonts=true",
+			"-sOutputFile=" + dst, defs, src,
+		]
+		run = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+		if run.returncode != 0 or not os.path.exists(dst):
+			raise RuntimeError("ghostscript failed: " + (run.stderr or run.stdout)[-800:])
+		with open(dst, "rb") as f:
+			return f.read()
