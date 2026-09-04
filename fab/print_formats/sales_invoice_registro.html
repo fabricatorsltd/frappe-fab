@@ -46,7 +46,8 @@
 	<tr>
 		<td><span class="code">{{ code }}</span> {{ name }}{% if lines %}<div class="sub">{{ lines | join("<br>") }}</div>{% endif %}</td>
 		<td class="n">{{ qty(item) }}</td>
-		<td class="n">{{ money(item.rate) }}</td>
+		{#- price before the line discount, so price, discount and amount read as one calculation -#}
+		<td class="n">{{ money(item.price_list_rate if item.discount_percentage else item.rate) }}</td>
 		<td class="n">{{ pct(item.discount_percentage or 0) }}</td>
 		<td class="n">{{ vat_rate(item) }}</td>
 		<td class="n">{{ money(item.amount) }} €</td>
