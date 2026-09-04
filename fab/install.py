@@ -142,6 +142,18 @@ def ensure_email_templates():
 			},
 		)
 
+	# picked up by the composer for the first email sent from an invoice
+	frappe.make_property_setter(
+		{
+			"doctype": "Sales Invoice",
+			"doctype_or_field": "DocType",
+			"property": "default_email_template",
+			"value": "Fattura cliente",
+			"property_type": "Data",
+		},
+		validate_fields_for_doctype=False,
+	)
+
 
 def read_email_template(filename: str) -> str:
 	with open(os.path.join(EMAIL_TEMPLATE_DIR, filename), encoding="utf-8") as f:
