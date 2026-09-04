@@ -36,44 +36,50 @@
 
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#14110f">
 {%- if it %}
+	{#- blank paragraphs between the blocks: the composer editor drops inline
+	    margins, an empty line survives it. The signature follows, so no company name. -#}
 	<p style="{{ p }}">Gentile {{ customer_name }},</p>
+	<p><br></p>
 	<p style="{{ p }}">in allegato trovi la {% if proforma %}proforma{% else %}fattura{% endif %} n. {{ name }} del {{ date }}, per un totale di {{ amount }}.</p>
-	{%- if terms %}
-	<p style="{{ p }}">Termini di pagamento: {{ terms }}.</p>
+	{%- if terms or schedule or ns.bank %}
+	<p><br></p>
+	<p style="{{ p }}">
+		{%- if terms %}Termini di pagamento: {{ terms }}.{% endif %}
+		{%- if schedule %}{% if terms %}<br>{% endif %}{% if schedule | length > 1 %}Scadenze{% else %}Scadenza{% endif %}: {{ due_dates(schedule, currency) }}.{% endif %}
+		{%- if ns.bank %}{% if terms or schedule %}<br>{% endif %}Coordinate per il bonifico: {{ bank_details(ns.bank) | trim }}.{% endif -%}
+	</p>
 	{%- endif %}
-	{%- if schedule %}
-	<p style="{{ p }}">{% if schedule | length > 1 %}Scadenze{% else %}Scadenza{% endif %}: {{ due_dates(schedule, currency) }}</p>
-	{%- endif %}
-	{%- if ns.bank %}
-	<p style="{{ p }}">Coordinate per il bonifico: {{ bank_details(ns.bank) | trim }}.</p>
-	{%- endif %}
+	<p><br></p>
 	{%- if proforma %}
 	<p style="{{ p }}">La proforma non ha valore fiscale: la fattura elettronica viene trasmessa tramite il Sistema di Interscambio al momento dell'emissione.</p>
 	{%- else %}
 	<p style="{{ p }}">La fattura elettronica viene trasmessa tramite il Sistema di Interscambio; questa copia è di cortesia.</p>
 	{%- endif %}
+	<p><br></p>
 	<p style="{{ p }}">Per qualsiasi domanda rispondi a questa email.</p>
+	<p><br></p>
 	<p style="{{ p }}">Cordiali saluti,</p>
-	<p style="margin:0">FABRICATORS S.R.L.</p>
 {%- else %}
 	<p style="{{ p }}">Dear {{ customer_name }},</p>
+	<p><br></p>
 	<p style="{{ p }}">please find attached {% if proforma %}proforma invoice{% else %}invoice{% endif %} no. {{ name }} dated {{ date }}, for a total of {{ amount }}.</p>
-	{%- if terms %}
-	<p style="{{ p }}">Payment terms: {{ terms }}.</p>
+	{%- if terms or schedule or ns.bank %}
+	<p><br></p>
+	<p style="{{ p }}">
+		{%- if terms %}Payment terms: {{ terms }}.{% endif %}
+		{%- if schedule %}{% if terms %}<br>{% endif %}Due date{% if schedule | length > 1 %}s{% endif %}: {{ due_dates(schedule, currency) }}.{% endif %}
+		{%- if ns.bank %}{% if terms or schedule %}<br>{% endif %}Bank details for the transfer: {{ bank_details(ns.bank) | trim }}.{% endif -%}
+	</p>
 	{%- endif %}
-	{%- if schedule %}
-	<p style="{{ p }}">Due date{% if schedule | length > 1 %}s{% endif %}: {{ due_dates(schedule, currency) }}</p>
-	{%- endif %}
-	{%- if ns.bank %}
-	<p style="{{ p }}">Bank details for the transfer: {{ bank_details(ns.bank) | trim }}.</p>
-	{%- endif %}
+	<p><br></p>
 	{%- if proforma %}
 	<p style="{{ p }}">A proforma is not valid for tax purposes: the electronic invoice is sent through the Italian SdI exchange system when the invoice is issued.</p>
 	{%- else %}
 	<p style="{{ p }}">The electronic invoice is sent through the Italian SdI exchange system; this copy is for your convenience.</p>
 	{%- endif %}
+	<p><br></p>
 	<p style="{{ p }}">For any question just reply to this email.</p>
+	<p><br></p>
 	<p style="{{ p }}">Kind regards,</p>
-	<p style="margin:0">FABRICATORS S.R.L.</p>
 {%- endif %}
 </div>
