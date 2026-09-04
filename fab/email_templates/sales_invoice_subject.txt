@@ -6,9 +6,11 @@
     the whole thing on one line. -#}
 {%- set lang = (language | default("", true)) | lower | trim -%}
 {%- set it = lang.startswith("it") -%}
+{%- set es = lang.startswith("es") -%}
 {%- set proforma = (docstatus | default(0, true)) | int == 0 -%}
 {%- set date = frappe.format_value(posting_date, {"fieldtype": "Date"}) -%}
 {%- if proforma %}Proforma {% endif -%}
 {%- if it %}Fattura {{ name }} del {{ date }}
+{%- elif es %}Factura {{ name }} de {{ date }}
 {%- else %}Invoice {{ name }} dated {{ date }}
 {%- endif -%}

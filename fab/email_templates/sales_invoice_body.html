@@ -6,6 +6,7 @@
     otherwise. No footer: the Email Account adds its own. -#}
 {%- set lang = (language | default("", true)) | lower | trim -%}
 {%- set it = lang.startswith("it") -%}
+{%- set es = lang.startswith("es") -%}
 {%- set proforma = (docstatus | default(0, true)) | int == 0 -%}
 {%- set date = frappe.format_value(posting_date, {"fieldtype": "Date"}) -%}
 {%- set amount = frappe.utils.fmt_money(grand_total, currency=currency) -%}
@@ -47,7 +48,7 @@
 	{%- if terms or schedule or ns.bank %}
 	<p><br></p>
 	<p style="{{ p }}">
-		{%- if terms %}Termini di pagamento: {{ terms }}.{% endif %}
+		{%- if terms %}Termini di pagamento: {{ terms }}{% if not terms.endswith(".") %}.{% endif %}{% endif %}
 		{%- if schedule %}{% if terms %}<br>{% endif %}{% if schedule | length > 1 %}Scadenze{% else %}Scadenza{% endif %}: {{ due_dates(schedule, currency) }}.{% endif %}
 		{%- if ns.bank %}{% if terms or schedule %}<br>{% endif %}Coordinate per il bonifico:{% endif -%}
 	</p>
@@ -65,6 +66,31 @@
 	<p style="{{ p }}">Per qualsiasi domanda rispondi a questa email.</p>
 	<p><br></p>
 	<p style="{{ p }}">Cordiali saluti,</p>
+{%- elif es %}
+	<p style="{{ p }}">Estimado cliente {{ customer_name }},</p>
+	<p><br></p>
+	<p style="{{ p }}">adjuntamos la {% if proforma %}factura proforma{% else %}factura{% endif %} n. {{ name }} de {{ date }}, por un importe total de {{ amount }}.</p>
+	{%- if terms or schedule or ns.bank %}
+	<p><br></p>
+	<p style="{{ p }}">
+		{%- if terms %}Condiciones de pago: {{ terms }}{% if not terms.endswith(".") %}.{% endif %}{% endif %}
+		{%- if schedule %}{% if terms %}<br>{% endif %}{% if schedule | length > 1 %}Vencimientos{% else %}Vencimiento{% endif %}: {{ due_dates(schedule, currency) }}.{% endif %}
+		{%- if ns.bank %}{% if terms or schedule %}<br>{% endif %}Datos bancarios para la transferencia:{% endif -%}
+	</p>
+	{%- if ns.bank %}
+	{{ bank_details(ns.bank) }}
+	{%- endif %}
+	{%- endif %}
+	<p><br></p>
+	{%- if proforma %}
+	<p style="{{ p }}">La proforma no tiene validez fiscal: la factura electrónica se transmite a través del sistema italiano SdI en el momento de la emisión.</p>
+	{%- else %}
+	<p style="{{ p }}">La factura electrónica se transmite a través del sistema italiano SdI; esta copia es de cortesía.</p>
+	{%- endif %}
+	<p><br></p>
+	<p style="{{ p }}">Para cualquier consulta, responda a este correo.</p>
+	<p><br></p>
+	<p style="{{ p }}">Un cordial saludo,</p>
 {%- else %}
 	<p style="{{ p }}">Dear {{ customer_name }},</p>
 	<p><br></p>
@@ -72,7 +98,7 @@
 	{%- if terms or schedule or ns.bank %}
 	<p><br></p>
 	<p style="{{ p }}">
-		{%- if terms %}Payment terms: {{ terms }}.{% endif %}
+		{%- if terms %}Payment terms: {{ terms }}{% if not terms.endswith(".") %}.{% endif %}{% endif %}
 		{%- if schedule %}{% if terms %}<br>{% endif %}Due date{% if schedule | length > 1 %}s{% endif %}: {{ due_dates(schedule, currency) }}.{% endif %}
 		{%- if ns.bank %}{% if terms or schedule %}<br>{% endif %}Bank details for the transfer:{% endif -%}
 	</p>
