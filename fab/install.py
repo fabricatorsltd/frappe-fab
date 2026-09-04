@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import frappe
 
@@ -87,6 +88,7 @@ def after_install():
 	ensure_helpdesk_org_settings()
 	ensure_website_languages()
 	ensure_print_formats()
+	ensure_email_templates()
 
 
 def after_migrate():
@@ -94,12 +96,56 @@ def after_migrate():
 	ensure_helpdesk_org_settings()
 	ensure_website_languages()
 	ensure_print_formats()
+	ensure_email_templates()
 
 
 def ensure_print_formats():
 	from fab.print_format import ensure_all
 
 	ensure_all()
+
+
+EMAIL_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "email_templates")
+# Offered by the Email Template picker in the Sales Invoice email composer, which
+# renders subject and body with the invoice itself as the Jinja context.
+EMAIL_TEMPLATES = (
+	{
+		"name": "Fattura cliente",
+		# Subject is a Data field, so the record only holds 140 characters: too few
+		# for the template. Jinja includes the file with the same context instead,
+		# and the app prefix resolves to apps/fab/fab (see frappe.utils.jinja._get_jloader).
+		"subject": '{% include "fab/email_templates/sales_invoice_subject.txt" %}',
+		"body_file": "sales_invoice_body.html",
+	},
+)
+
+
+def ensure_email_templates():
+	"""Create the seeded email templates and push subject and body back over the
+	records on every migrate, the way the print format is kept in sync."""
+	if not frappe.db.exists("DocType", "Email Template"):
+		return
+
+	for template in EMAIL_TEMPLATES:
+		doc = get_or_create_doc(
+			"Email Template",
+			template["name"],
+			{"doctype": "Email Template", "name": template["name"]},
+		)
+		update_doc(
+			doc,
+			{
+				"subject": template["subject"],
+				# the body is HTML, so it belongs in response_html, not the rich text field
+				"use_html": 1,
+				"response_html": read_email_template(template["body_file"]),
+			},
+		)
+
+
+def read_email_template(filename: str) -> str:
+	with open(os.path.join(EMAIL_TEMPLATE_DIR, filename), encoding="utf-8") as f:
+		return f.read().strip()
 
 
 # Languages our customers speak: the only ones we fully translate and the only

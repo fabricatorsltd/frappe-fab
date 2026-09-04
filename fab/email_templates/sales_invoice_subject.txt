@@ -1,0 +1,14 @@
+{#- Subject of the "Fattura cliente" Email Template, included by the record because
+    the Subject field only holds 140 characters. An Email Template renders with the
+    document itself as the Jinja context (EmailTemplate.get_formatted_email calls
+    render_template(subject, doc)), so the invoice fields are top level here and not
+    under a "doc" variable, and the include inherits that context. Trim markers keep
+    the whole thing on one line. -#}
+{%- set lang = (language | default("", true)) | lower | trim -%}
+{%- set it = lang.startswith("it") -%}
+{%- set proforma = (docstatus | default(0, true)) | int == 0 -%}
+{%- set date = frappe.format_value(posting_date, {"fieldtype": "Date"}) -%}
+{%- if proforma %}Proforma {% endif -%}
+{%- if it %}Fattura {{ name }} del {{ date }}
+{%- else %}Invoice {{ name }} dated {{ date }}
+{%- endif -%}

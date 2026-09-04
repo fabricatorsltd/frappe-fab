@@ -1,0 +1,79 @@
+{#- Body of the "Fattura cliente" Email Template, sent from the Sales Invoice email
+    composer with the invoice PDF attached. An Email Template renders with the document
+    itself as the Jinja context (EmailTemplate.get_formatted_email calls
+    render_template(response_html, doc)), so the invoice fields are top level here and
+    not under a "doc" variable. Italian when the invoice language is Italian, English
+    otherwise. No footer: the Email Account adds its own. -#}
+{%- set lang = (language | default("", true)) | lower | trim -%}
+{%- set it = lang.startswith("it") -%}
+{%- set proforma = (docstatus | default(0, true)) | int == 0 -%}
+{%- set date = frappe.format_value(posting_date, {"fieldtype": "Date"}) -%}
+{%- set amount = frappe.utils.fmt_money(grand_total, currency=currency) -%}
+{%- set terms = payment_terms_template | default("", true) -%}
+{%- set schedule = payment_schedule | default([], true) -%}
+{%- set ns = namespace(bank=None) -%}
+{%- for row in schedule -%}
+	{%- if not ns.bank and (row.get("bank_account_iban") or row.get("bank_account_name")) -%}
+		{%- set ns.bank = row -%}
+	{%- endif -%}
+{%- endfor -%}
+{%- set p = "margin:0 0 12px" -%}
+
+{#- one date on a single instalment, date and amount per line when there are more -#}
+{%- macro due_dates(rows, currency) -%}
+	{%- for row in rows -%}
+		{{ frappe.format_value(row.get("due_date"), {"fieldtype": "Date"}) }}
+		{%- if rows | length > 1 %}: {{ frappe.utils.fmt_money(row.get("payment_amount"), currency=currency) }}{% endif %}
+		{%- if not loop.last %}<br>{% endif -%}
+	{%- endfor -%}
+{%- endmacro -%}
+
+{%- macro bank_details(row) -%}
+	{{- (row.get("bank_account_name") or "") -}}
+	{%- if row.get("bank_account_iban") %} IBAN {{ row.get("bank_account_iban") }}{% endif -%}
+	{%- if row.get("bank_account_swift_number") %} BIC {{ row.get("bank_account_swift_number") }}{% endif -%}
+{%- endmacro -%}
+
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#14110f">
+{%- if it %}
+	<p style="{{ p }}">Gentile {{ customer_name }},</p>
+	<p style="{{ p }}">in allegato trovi la {% if proforma %}proforma{% else %}fattura{% endif %} n. {{ name }} del {{ date }}, per un totale di {{ amount }}.</p>
+	{%- if terms %}
+	<p style="{{ p }}">Termini di pagamento: {{ terms }}.</p>
+	{%- endif %}
+	{%- if schedule %}
+	<p style="{{ p }}">{% if schedule | length > 1 %}Scadenze{% else %}Scadenza{% endif %}: {{ due_dates(schedule, currency) }}</p>
+	{%- endif %}
+	{%- if ns.bank %}
+	<p style="{{ p }}">Coordinate per il bonifico: {{ bank_details(ns.bank) | trim }}.</p>
+	{%- endif %}
+	{%- if proforma %}
+	<p style="{{ p }}">La proforma non ha valore fiscale: la fattura elettronica viene trasmessa tramite il Sistema di Interscambio al momento dell'emissione.</p>
+	{%- else %}
+	<p style="{{ p }}">La fattura elettronica viene trasmessa tramite il Sistema di Interscambio; questa copia è di cortesia.</p>
+	{%- endif %}
+	<p style="{{ p }}">Per qualsiasi domanda rispondi a questa email.</p>
+	<p style="{{ p }}">Cordiali saluti,</p>
+	<p style="margin:0">FABRICATORS S.R.L.</p>
+{%- else %}
+	<p style="{{ p }}">Dear {{ customer_name }},</p>
+	<p style="{{ p }}">please find attached {% if proforma %}proforma invoice{% else %}invoice{% endif %} no. {{ name }} dated {{ date }}, for a total of {{ amount }}.</p>
+	{%- if terms %}
+	<p style="{{ p }}">Payment terms: {{ terms }}.</p>
+	{%- endif %}
+	{%- if schedule %}
+	<p style="{{ p }}">Due date{% if schedule | length > 1 %}s{% endif %}: {{ due_dates(schedule, currency) }}</p>
+	{%- endif %}
+	{%- if ns.bank %}
+	<p style="{{ p }}">Bank details for the transfer: {{ bank_details(ns.bank) | trim }}.</p>
+	{%- endif %}
+	{%- if proforma %}
+	<p style="{{ p }}">A proforma is not valid for tax purposes: the electronic invoice is sent through the Italian SdI exchange system when the invoice is issued.</p>
+	{%- else %}
+	<p style="{{ p }}">The electronic invoice is sent through the Italian SdI exchange system; this copy is for your convenience.</p>
+	{%- endif %}
+	<p style="{{ p }}">For any question just reply to this email.</p>
+	<p style="{{ p }}">Kind regards,</p>
+	<p style="margin:0">FABRICATORS S.R.L.</p>
+{%- endif %}
+</div>
