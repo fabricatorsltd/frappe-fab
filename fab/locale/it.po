@@ -123,3 +123,6 @@ msgstr "continua alla pagina"
 msgctxt "invoice"
 msgid "continued from page"
 msgstr "segue dalla pagina"
+
+msgid "Wire Transfer"
+msgstr "Bonifico bancario"

@@ -5,7 +5,11 @@
 {%- set bank = bank_accounts[0] if bank_accounts else None -%}
 {%- set bic = frappe.db.get_value("Bank", bank.bank, "swift_number") if bank else None -%}
 {%- set address = frappe.get_doc("Address", doc.customer_address) if doc.customer_address else None -%}
-{%- set payment = doc.payment_terms_template or _("Bank transfer", context="invoice") -%}
+{#- how the customer pays, not how many days they get: the days are already the printed
+    due date, and the terms template is a record name, always Italian and stale as soon as
+    somebody edits the due date by hand -#}
+{%- set payment_mode = doc.payment_schedule[0].mode_of_payment if doc.payment_schedule else None -%}
+{%- set payment = _(payment_mode) if payment_mode else _("Bank transfer", context="invoice") -%}
 {%- set closing_rows = 2 if doc.items|length > 2 else 0 -%}
 {%- set split_at = doc.items|length - closing_rows -%}
 {%- set plain_uoms = ["NR", "Nos", "Unit", "Pz", "PZ"] -%}
@@ -183,7 +187,7 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 			<tr><td colspan="6" class="paycell">
 				<div class="two">
 					<div>
-						<div class="lbl">{{ _("Transfer", context="invoice") if not doc.payment_terms_template else payment }}{% if bank %} · {{ bank.bank | title }}{% endif %}</div>
+						<div class="lbl">{{ payment }}{% if bank %} · {{ bank.bank | title }}{% endif %}</div>
 						{%- if bank and bank.iban %}
 						{%- set iban = bank.iban | replace(" ", "") %}
 						<div class="iban">{% for i in range(0, iban|length, 4) %}{{ iban[i:i+4] }} {% endfor %}</div>
