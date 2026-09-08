@@ -109,6 +109,18 @@ msgid "Courtesy copy: the XML sent to the SdI is the legal document."
 msgstr "Copia de cortesía: el XML enviado al SdI es el documento legal."
 
 msgctxt "invoice"
+msgid "Order ref."
+msgstr "Ref. pedido"
+
+msgctxt "invoice"
+msgid "of"
+msgstr "del"
+
+msgctxt "invoice"
+msgid "VAT under split payment (art. 17-ter DPR 633/72)"
+msgstr "IVA en escisión de pagos (art. 17-ter DPR 633/72)"
+
+msgctxt "invoice"
 msgid "Proforma: not valid for tax purposes, the electronic invoice is sent to the SdI on issue."
 msgstr "Proforma: sin validez fiscal, la factura electrónica se envía al SdI en el momento de la emisión."
 

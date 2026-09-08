@@ -14,6 +14,15 @@
 {%- set split_at = doc.items|length - closing_rows -%}
 {%- set plain_uoms = ["NR", "Nos", "Unit", "Pz", "PZ"] -%}
 {%- set note = (doc.terms | striptags | trim) if doc.terms else (_("Proforma: not valid for tax purposes, the electronic invoice is sent to the SdI on issue.", context="invoice") if doc.docstatus == 0 else _("Courtesy copy: the XML sent to the SdI is the legal document.", context="invoice")) -%}
+{#- a public administration pays against its order (determina) and the CIG, so both go on paper too -#}
+{%- set order_ref = "" -%}
+{%- if doc.po_no -%}
+	{%- set order_ref = _("Order ref.", context="invoice") ~ " " ~ doc.po_no -%}
+	{%- if doc.po_date -%}{%- set order_ref = order_ref ~ " " ~ _("of", context="invoice") ~ " " ~ frappe.utils.formatdate(doc.po_date, "dd/mm/yyyy") -%}{%- endif -%}
+{%- endif -%}
+{%- if doc.get("fab_edi_cig") -%}{%- set order_ref = (order_ref ~ " · " if order_ref else "") ~ "CIG " ~ doc.fab_edi_cig -%}{%- endif -%}
+{%- if doc.get("fab_edi_cup") -%}{%- set order_ref = (order_ref ~ " · " if order_ref else "") ~ "CUP " ~ doc.fab_edi_cup -%}{%- endif -%}
+{%- set split_payment = _("VAT under split payment (art. 17-ter DPR 633/72)", context="invoice") if (doc.get("vat_collectability") or "").startswith("S") else "" -%}
 
 {%- macro money(v) -%}{{ frappe.utils.fmt_money(v, 2) }}{%- endmacro -%}
 {%- macro qty(item) -%}
@@ -197,7 +206,7 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 					</div>
 					<div>
 						<div class="lbl">{{ _("Notes", context="invoice") }}</div>
-						<div class="note">{{ note | replace("\n", "<br>") }}</div>
+						<div class="note">{% if order_ref %}{{ order_ref }}<br>{% endif %}{% if split_payment %}{{ split_payment }}<br>{% endif %}{{ note | replace("\n", "<br>") }}</div>
 					</div>
 				</div>
 			</td></tr>
