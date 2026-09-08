@@ -38,7 +38,8 @@
 {%- endmacro -%}
 {%- macro tax_label(tax) -%}
 	{%- set d = (tax.description or "") | striptags | trim -%}
-	{%- if d | lower | truncate(3, true, "") == "iva" %}{{ d }}{% else %}{{ _("VAT", context="invoice") }} {{ d }}{% endif -%}
+	{#- truncate() keeps short strings whole (leeway), so it never matched: test the prefix -#}
+	{%- if (d | lower).startswith("iva") %}{{ d }}{% else %}{{ _("VAT", context="invoice") }} {{ d }}{% endif -%}
 {%- endmacro -%}
 {%- macro line(item) -%}
 	{%- if item.get("fab_section") %}<tr class="band"><td colspan="6">{{ item.fab_section }}</td></tr>{% endif -%}
@@ -57,7 +58,7 @@
 	{%- endfor -%}
 	{%- set lines = ns.lines -%}
 	<tr>
-		<td><span class="code">{{ code }}</span> {{ name }}{% if lines %}<div class="sub">{{ lines | join("<br>") }}</div>{% endif %}</td>
+		<td>{% if code %}<span class="code">{{ code }}</span> {% endif %}{{ name }}{% if lines %}<div class="sub">{{ lines | join("<br>") }}</div>{% endif %}</td>
 		<td class="n">{{ qty(item) }}</td>
 		{#- price before the line discount, so price, discount and amount read as one calculation -#}
 		<td class="n">{{ money(item.price_list_rate if item.discount_percentage else item.rate) }}</td>
