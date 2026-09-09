@@ -89,6 +89,7 @@ def after_install():
 	ensure_website_languages()
 	ensure_print_formats()
 	ensure_email_templates()
+	ensure_invoice_language_is_editable()
 
 
 def after_migrate():
@@ -97,6 +98,24 @@ def after_migrate():
 	ensure_website_languages()
 	ensure_print_formats()
 	ensure_email_templates()
+	ensure_invoice_language_is_editable()
+
+
+def ensure_invoice_language_is_editable():
+	"""ERPNext copies the print language from the customer and locks the field, but
+	one invoice to a foreign branch or a bilingual customer has to be printed and
+	emailed in its own language without touching the customer record."""
+	frappe.make_property_setter(
+		{
+			"doctype": "Sales Invoice",
+			"doctype_or_field": "DocField",
+			"fieldname": "language",
+			"property": "read_only",
+			"value": "0",
+			"property_type": "Check",
+		},
+		validate_fields_for_doctype=False,
+	)
 
 
 def ensure_print_formats():
