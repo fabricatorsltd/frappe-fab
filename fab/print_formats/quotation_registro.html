@@ -40,7 +40,9 @@
 {#- the terms field carries the contract text, printed whole under the table: the note box
     next to the payment plan is the short free text the seller types per quotation -#}
 {%- set note = as_lines(doc.get("fab_notes")) | trim -%}
-{%- set terms = as_lines(doc.terms) | trim -%}
+{#- the contract text keeps the editor's bold, lists and paragraphs; Frappe already sanitizes
+    the field on save, the CSS below neutralises colours and fonts that came along -#}
+{%- set terms = (doc.terms or "") if ((doc.terms or "") | striptags | trim) else "" -%}
 
 {%- macro money(v) -%}{{ frappe.utils.fmt_money(v, 2) }}{%- endmacro -%}
 {%- macro qty(item) -%}
@@ -155,6 +157,14 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 .reg .note{color:#857B72;font-size:12.5px;line-height:1.4;margin-top:3.75px}
 .reg .tc{margin-top:22.5px;padding-top:15px;border-top:1px solid #E3DCD4}
 .reg .tcbody{color:#4A423C;font-size:12.5px;line-height:1.45;margin-top:5px;text-align:justify}
+.reg .tcbody *{color:inherit!important;font-family:inherit!important;font-size:inherit!important;background:none!important}
+.reg .tcbody p{margin:0 0 4px}
+.reg .tcbody p:empty,.reg .tcbody p:has(> br:only-child){height:8px;margin:0}
+.reg .tcbody strong,.reg .tcbody b{font-weight:600}
+.reg .tcbody ul,.reg .tcbody ol{margin:0 0 4px 18px;padding:0}
+.reg .tcbody h1,.reg .tcbody h2,.reg .tcbody h3{font-size:12.5px!important;font-weight:600;margin:8px 0 3px}
+.reg .tcbody table{border-collapse:collapse;width:100%;margin:4px 0}
+.reg .tcbody td,.reg .tcbody th{border:1px solid #E3DCD4;padding:2px 4px;vertical-align:top}
 #header-html,#footer-html{font-family:Montserrat,sans-serif;color:#857B72}
 .hd2{display:flex;justify-content:space-between;align-items:center;padding:7.5px 0;border-bottom:2px solid #FF6700;white-space:nowrap;box-sizing:border-box;height:40px;overflow:hidden}
 .hd2 .wm2{height:22.5px;width:auto}
