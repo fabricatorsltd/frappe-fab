@@ -138,3 +138,17 @@ msgstr "suite de la page"
 
 msgid "Wire Transfer"
 msgstr "Virement bancaire"
+
+# Maximum discount override
+
+msgid "Override maximum discount"
+msgstr "Dérogation à la remise maximale"
+
+msgid "Override reason"
+msgstr "Motif de la dérogation"
+
+msgid "Give a reason for overriding the maximum discount."
+msgstr "Indiquez un motif pour déroger à la remise maximale."
+
+msgid "Only a Sales Manager can override the maximum discount."
+msgstr "Seul un Sales Manager peut déroger à la remise maximale."

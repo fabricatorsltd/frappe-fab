@@ -192,6 +192,17 @@ doc_events = {
 # 	"Task": "fab.custom.task.CustomTaskMixin"
 # }
 
+# DocType Class
+# ------------------------------
+# The selling controller throws on a row discount above the item's max_discount
+# before any doc_event runs, so the waiver lives on the controller class.
+override_doctype_class = {
+	"Quotation": "fab.overrides.selling.Quotation",
+	"Sales Order": "fab.overrides.selling.SalesOrder",
+	"Sales Invoice": "fab.overrides.selling.SalesInvoice",
+	"Delivery Note": "fab.overrides.selling.DeliveryNote",
+}
+
 # Overriding Methods
 # ------------------------------
 #

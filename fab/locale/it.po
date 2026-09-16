@@ -27179,3 +27179,17 @@ msgstr "{} non trovato nel PATH! Questo è necessario per ripristinare il databa
 
 msgid "{} not found in PATH! This is required to take a backup."
 msgstr "{} non trovato nel PATH! Questo è necessario per eseguire un backup."
+
+# Maximum discount override
+
+msgid "Override maximum discount"
+msgstr "Deroga sconto massimo"
+
+msgid "Override reason"
+msgstr "Motivo della deroga"
+
+msgid "Give a reason for overriding the maximum discount."
+msgstr "Indica un motivo per derogare allo sconto massimo."
+
+msgid "Only a Sales Manager can override the maximum discount."
+msgstr "Solo un Sales Manager può derogare allo sconto massimo."

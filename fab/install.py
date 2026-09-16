@@ -4,6 +4,8 @@ import json
 import os
 
 import frappe
+from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from frappe.permissions import add_permission, update_permission_property
 
 # The record name has to match the label exactly: get_desktop_icons() collects the
 # permitted parents by label but filters the children by parent_icon, which stores
@@ -90,6 +92,7 @@ def after_install():
 	ensure_print_formats()
 	ensure_email_templates()
 	ensure_invoice_language_is_editable()
+	ensure_max_discount_override()
 
 
 def after_migrate():
@@ -99,6 +102,103 @@ def after_migrate():
 	ensure_print_formats()
 	ensure_email_templates()
 	ensure_invoice_language_is_editable()
+	ensure_max_discount_override()
+
+
+# Selling documents where a sales manager may waive the item max_discount, see
+# fab.overrides.selling.
+MAX_DISCOUNT_OVERRIDE_DOCTYPES = ("Quotation", "Sales Order", "Sales Invoice", "Delivery Note")
+MAX_DISCOUNT_OVERRIDE_PERMLEVEL = 1
+
+
+def ensure_max_discount_override():
+	ensure_max_discount_override_fields()
+	ensure_max_discount_override_permissions()
+
+
+def ensure_max_discount_override_fields():
+	create_custom_fields(get_max_discount_override_custom_fields(), update=True)
+
+
+def get_max_discount_override_custom_fields() -> dict[str, list[dict[str, object]]]:
+	fields = [
+		{
+			"fieldname": "fab_max_discount_override",
+			"fieldtype": "Check",
+			"label": "Override maximum discount",
+			# a role without write on this level sees the flag read only or not at
+			# all, and the waiver is refused again on the server for good measure
+			"permlevel": MAX_DISCOUNT_OVERRIDE_PERMLEVEL,
+			"insert_after": "discount_amount",
+			"print_hide": 1,
+		},
+		{
+			"fieldname": "fab_max_discount_override_reason",
+			"fieldtype": "Small Text",
+			"label": "Override reason",
+			"depends_on": "eval:doc.fab_max_discount_override",
+			"mandatory_depends_on": "eval:doc.fab_max_discount_override",
+			"permlevel": MAX_DISCOUNT_OVERRIDE_PERMLEVEL,
+			"insert_after": "fab_max_discount_override",
+			"print_hide": 1,
+		},
+	]
+
+	return {doctype: fields for doctype in get_max_discount_override_doctypes()}
+
+
+def get_max_discount_override_doctypes() -> list[str]:
+	return [dt for dt in MAX_DISCOUNT_OVERRIDE_DOCTYPES if frappe.db.exists("DocType", dt)]
+
+
+def ensure_max_discount_override_permissions():
+	"""Give the sales manager read and write on permlevel 1 of the selling documents.
+
+	Without a rule at that level nobody can touch the two override fields, not even
+	the role the waiver is meant for. ERPNext already ships one on Quotation and
+	Sales Order, so the effective permissions are read first: writing a Custom
+	DocPerm moves the whole doctype off the standard rules for good, and that is
+	worth doing only where the rule is actually missing.
+	"""
+	from fab.overrides.selling import MAX_DISCOUNT_OVERRIDE_ROLE
+
+	for doctype in get_max_discount_override_doctypes():
+		missing = [
+			ptype
+			for ptype in ("read", "write")
+			if not has_permlevel_access(doctype, MAX_DISCOUNT_OVERRIDE_ROLE, ptype)
+		]
+		if not missing:
+			continue
+
+		if not frappe.db.exists(
+			"Custom DocPerm",
+			{
+				"parent": doctype,
+				"role": MAX_DISCOUNT_OVERRIDE_ROLE,
+				"permlevel": MAX_DISCOUNT_OVERRIDE_PERMLEVEL,
+			},
+		):
+			add_permission(doctype, MAX_DISCOUNT_OVERRIDE_ROLE, MAX_DISCOUNT_OVERRIDE_PERMLEVEL)
+
+		for ptype in missing:
+			update_permission_property(
+				doctype,
+				MAX_DISCOUNT_OVERRIDE_ROLE,
+				MAX_DISCOUNT_OVERRIDE_PERMLEVEL,
+				ptype,
+				1,
+			)
+
+
+def has_permlevel_access(doctype: str, role: str, ptype: str) -> bool:
+	"""Whether the role already holds ptype on the override permlevel, from the
+	standard rules or from a Custom DocPerm: get_meta() returns whichever set is in
+	force."""
+	return any(
+		perm.role == role and perm.permlevel == MAX_DISCOUNT_OVERRIDE_PERMLEVEL and perm.get(ptype)
+		for perm in frappe.get_meta(doctype).permissions
+	)
 
 
 def ensure_invoice_language_is_editable():
