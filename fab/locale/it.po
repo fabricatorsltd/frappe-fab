@@ -21729,7 +21729,7 @@ msgid "Submission Queue"
 msgstr "Coda di invio"
 
 msgid "Submit"
-msgstr "Invia"
+msgstr "Conferma"
 
 msgid "Submit After Import"
 msgstr "Invia dopo l'importazione"
@@ -21753,13 +21753,16 @@ msgid "Submit this document to complete this step."
 msgstr "Invia questo documento per completare questo passaggio."
 
 msgid "Submit this document to confirm"
-msgstr "Invia questo documento per confermare"
+msgstr "Conferma il documento per renderlo definitivo"
+
+msgid "Not Submitted"
+msgstr "Non confermato"
 
 msgid "Submit {0} documents?"
 msgstr "Inviare {0} documenti?"
 
 msgid "Submitted"
-msgstr "Inviato"
+msgstr "Confermato"
 
 msgid "Submitted Document cannot be converted back to draft. Transition row {0}"
 msgstr "Il documento inviato non può essere riconvertito in bozza. Riga transizione {0}"
