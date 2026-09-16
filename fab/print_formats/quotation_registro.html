@@ -13,7 +13,11 @@
 {%- for row in schedule -%}{%- if (row.description or "") | striptags | trim -%}{%- set nd.described = true -%}{%- endif -%}{%- endfor -%}
 {#- a single 100% row with no wording says nothing the payment line does not already say -#}
 {%- set show_schedule = schedule | length > 1 or nd.described -%}
-{%- set closing_rows = 2 if doc.items|length > 2 else 0 -%}
+{#- the totals travel with the last line so they never open a page alone, but only
+    when that line is short: a long description dragged along leaves a blank page -#}
+{%- set last_item = doc.items[-1] if doc.items else None -%}
+{%- set last_is_short = last_item and not last_item.get("fab_note") and ((last_item.description or "") | striptags | trim | length) <= 120 -%}
+{%- set closing_rows = 1 if doc.items|length > 1 and last_is_short else 0 -%}
 {%- set split_at = doc.items|length - closing_rows -%}
 {%- set plain_uoms = ["NR", "Nos", "Unit", "Pz", "PZ"] -%}
 {#- the Italian regional hook fills the per line tax_rate from the itemised tax, where 0 is a
@@ -240,9 +244,9 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 		</tbody>
 	</table>
 	{%- if terms %}
-	{#- the contract text runs as long as it needs to and may break over pages, the closing
-	    block above stays together because it is a tbody of its own -#}
-	<div class="tc">
+	{#- the contract text always opens on a page of its own, after the offer, and may run
+	    over several pages; the closing block above stays together because it is a tbody -#}
+	<div class="tc" style="break-before:page;page-break-before:always">
 		<div class="lbl">{{ _("Terms and conditions", context="quotation") }}</div>
 		<div class="tcbody">{{ terms }}</div>
 	</div>
