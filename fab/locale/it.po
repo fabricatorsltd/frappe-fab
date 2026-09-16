@@ -90,6 +90,10 @@ msgid "Taxable amount"
 msgstr "Imponibile"
 
 msgctxt "invoice"
+msgid "Lines total"
+msgstr "Totale righe"
+
+msgctxt "invoice"
 msgid "Bank transfer"
 msgstr "Bonifico bancario"
 
@@ -136,6 +140,28 @@ msgstr "continua alla pagina"
 msgctxt "invoice"
 msgid "continued from page"
 msgstr "segue dalla pagina"
+
+# Quotation print format, on top of the invoice strings above
+
+msgctxt "quotation"
+msgid "Quotation"
+msgstr "Preventivo"
+
+msgctxt "quotation"
+msgid "Draft"
+msgstr "Bozza"
+
+msgctxt "quotation"
+msgid "Valid until"
+msgstr "Valido fino al"
+
+msgctxt "quotation"
+msgid "This quotation is valid until {0}. Prices exclude VAT unless stated."
+msgstr "Preventivo valido fino al {0}. Prezzi IVA esclusa salvo diversa indicazione."
+
+msgctxt "quotation"
+msgid "Prices exclude VAT unless stated."
+msgstr "Prezzi IVA esclusa salvo diversa indicazione."
 
 msgid "Wire Transfer"
 msgstr "Bonifico bancario"

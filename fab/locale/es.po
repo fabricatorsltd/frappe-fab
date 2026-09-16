@@ -89,6 +89,10 @@ msgid "Taxable amount"
 msgstr "Base imponible"
 
 msgctxt "invoice"
+msgid "Lines total"
+msgstr "Total de líneas"
+
+msgctxt "invoice"
 msgid "Bank transfer"
 msgstr "Transferencia bancaria"
 
@@ -135,6 +139,28 @@ msgstr "continúa en la página"
 msgctxt "invoice"
 msgid "continued from page"
 msgstr "continúa de la página"
+
+# Quotation print format, on top of the invoice strings above
+
+msgctxt "quotation"
+msgid "Quotation"
+msgstr "Presupuesto"
+
+msgctxt "quotation"
+msgid "Draft"
+msgstr "Borrador"
+
+msgctxt "quotation"
+msgid "Valid until"
+msgstr "Válido hasta el"
+
+msgctxt "quotation"
+msgid "This quotation is valid until {0}. Prices exclude VAT unless stated."
+msgstr "Presupuesto válido hasta el {0}. Precios sin IVA salvo indicación contraria."
+
+msgctxt "quotation"
+msgid "Prices exclude VAT unless stated."
+msgstr "Precios sin IVA salvo indicación contraria."
 
 msgid "Wire Transfer"
 msgstr "Transferencia bancaria"

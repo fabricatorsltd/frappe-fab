@@ -89,6 +89,10 @@ msgid "Taxable amount"
 msgstr "Base imposable"
 
 msgctxt "invoice"
+msgid "Lines total"
+msgstr "Total des lignes"
+
+msgctxt "invoice"
 msgid "Bank transfer"
 msgstr "Virement bancaire"
 
@@ -135,6 +139,28 @@ msgstr "suite à la page"
 msgctxt "invoice"
 msgid "continued from page"
 msgstr "suite de la page"
+
+# Quotation print format, on top of the invoice strings above
+
+msgctxt "quotation"
+msgid "Quotation"
+msgstr "Devis"
+
+msgctxt "quotation"
+msgid "Draft"
+msgstr "Brouillon"
+
+msgctxt "quotation"
+msgid "Valid until"
+msgstr "Valable jusqu'au"
+
+msgctxt "quotation"
+msgid "This quotation is valid until {0}. Prices exclude VAT unless stated."
+msgstr "Devis valable jusqu'au {0}. Prix hors TVA sauf indication contraire."
+
+msgctxt "quotation"
+msgid "Prices exclude VAT unless stated."
+msgstr "Prix hors TVA sauf indication contraire."
 
 msgid "Wire Transfer"
 msgstr "Virement bancaire"

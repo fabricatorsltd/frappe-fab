@@ -60,9 +60,13 @@
 	<tr>
 		<td>{% if code %}<span class="code">{{ code }}</span> {% endif %}{{ name }}{% if lines %}<div class="sub">{{ lines | join("<br>") }}</div>{% endif %}</td>
 		<td class="n">{{ qty(item) }}</td>
-		{#- price before the line discount, so price, discount and amount read as one calculation -#}
-		<td class="n">{{ money(item.price_list_rate if item.discount_percentage else item.rate) }}</td>
-		<td class="n">{{ pct(item.discount_percentage or 0) }}</td>
+		{#- price before the line discount, so price, discount and amount read as one calculation.
+		    A discount typed as an amount leaves discount_percentage at 0: show its equivalent -#}
+		{%- set has_discount = item.discount_percentage or item.discount_amount -%}
+		{%- set list_price = item.price_list_rate or (item.rate + (item.discount_amount or 0)) -%}
+		{%- set discount_pct = item.discount_percentage or ((item.discount_amount / list_price * 100) | round(1) if item.discount_amount and list_price else 0) -%}
+		<td class="n">{{ money(list_price if has_discount else item.rate) }}</td>
+		<td class="n">{{ pct(discount_pct) }}</td>
 		<td class="n">{{ vat_rate(item) }}</td>
 		<td class="n">{{ money(item.amount) }} €</td>
 	</tr>
@@ -187,11 +191,16 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 		</tbody>
 		<tbody class="closing">
 			{%- for item in doc.items[split_at:] %}{{ line(item) }}{% endfor %}
+			{#- a discount on the net total is folded into Imponibile: spell it out or the lines will not add up -#}
+			{%- if doc.discount_amount and doc.apply_discount_on == "Net Total" %}
+			<tr class="sum"><td colspan="5" class="n">{{ _("Lines total", context="invoice") }}</td><td class="n">{{ money(doc.total) }} €</td></tr>
+			<tr class="sum"><td colspan="5" class="n">{{ _("Discount", context="invoice") }}{% if doc.additional_discount_percentage %} {{ pct(doc.additional_discount_percentage) }}{% endif %}</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>
+			{%- endif %}
 			<tr class="sum"><td colspan="5" class="n">{{ _("Taxable amount", context="invoice") }}</td><td class="n">{{ money(doc.net_total) }} €</td></tr>
 			{%- for tax in doc.taxes %}
 			<tr class="sum"><td colspan="5" class="n">{{ tax_label(tax) }}</td><td class="n">{{ money(tax.tax_amount) }} €</td></tr>
 			{%- endfor %}
-			{#- a discount on the net total is already inside Imponibile; only a grand-total discount is a separate step -#}
+			{#- a grand-total discount comes after the taxes, so it is a separate step -#}
 			{%- if doc.discount_amount and doc.apply_discount_on == "Grand Total" %}<tr class="sum"><td colspan="5" class="n">{{ _("Discount", context="invoice") }}</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>{% endif %}
 			<tr class="sum grand"><td colspan="5" class="n">{{ _("Total", context="invoice") }}</td><td class="n">{{ money(doc.grand_total) }} €</td></tr>
 			<tr><td colspan="6" class="paycell">
