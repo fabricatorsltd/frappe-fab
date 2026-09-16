@@ -93,6 +93,7 @@ def after_install():
 	ensure_email_templates()
 	ensure_invoice_language_is_editable()
 	ensure_max_discount_override()
+	ensure_selling_grid_columns()
 
 
 def after_migrate():
@@ -103,6 +104,31 @@ def after_migrate():
 	ensure_email_templates()
 	ensure_invoice_language_is_editable()
 	ensure_max_discount_override()
+	ensure_selling_grid_columns()
+
+
+# Item rows of the selling documents, where the list price and the discount are
+# what a sale is negotiated on: show them in the grid without per-user setup.
+SELLING_ITEM_DOCTYPES = ("Quotation Item", "Sales Order Item", "Delivery Note Item", "Sales Invoice Item")
+SELLING_GRID_COLUMNS = ("price_list_rate", "discount_percentage")
+
+
+def ensure_selling_grid_columns():
+	for doctype in SELLING_ITEM_DOCTYPES:
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		for fieldname in SELLING_GRID_COLUMNS:
+			frappe.make_property_setter(
+				{
+					"doctype": doctype,
+					"doctype_or_field": "DocField",
+					"fieldname": fieldname,
+					"property": "in_list_view",
+					"value": "1",
+					"property_type": "Check",
+				},
+				validate_fields_for_doctype=False,
+			)
 
 
 # Selling documents where a sales manager may waive the item max_discount, see
