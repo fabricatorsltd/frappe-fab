@@ -1,0 +1,250 @@
+{#- FABRICATORS quotation, "Registro" layout. Rendered with the Chrome PDF generator.
+    Same sizes as the sales invoice format, which this one mirrors on purpose. -#}
+{%- set company = frappe.get_doc("Company", doc.company) -%}
+{%- set address = frappe.get_doc("Address", doc.customer_address) if doc.customer_address else None -%}
+{#- Quotation has no tax_id of its own, the party record holds it -#}
+{%- set party = frappe.db.get_value("Customer", doc.party_name, ["tax_id", "fiscal_code"], as_dict=True) if doc.quotation_to == "Customer" and doc.party_name else None -%}
+{#- a quotation is negotiated on its terms, so the template name is the real answer here,
+    unlike on an invoice where it is a stale label over an already printed due date -#}
+{%- set payment_mode = doc.payment_schedule[0].mode_of_payment if doc.payment_schedule else None -%}
+{%- set payment = doc.payment_terms_template or (_(payment_mode) if payment_mode else _("Bank transfer", context="invoice")) -%}
+{%- set schedule = doc.payment_schedule or [] -%}
+{%- set nd = namespace(described=false) -%}
+{%- for row in schedule -%}{%- if (row.description or "") | striptags | trim -%}{%- set nd.described = true -%}{%- endif -%}{%- endfor -%}
+{#- a single 100% row with no wording says nothing the payment line does not already say -#}
+{%- set show_schedule = schedule | length > 1 or nd.described -%}
+{%- set closing_rows = 2 if doc.items|length > 2 else 0 -%}
+{%- set split_at = doc.items|length - closing_rows -%}
+{%- set plain_uoms = ["NR", "Nos", "Unit", "Pz", "PZ"] -%}
+{#- the Italian regional hook fills the per line tax_rate from the itemised tax, where 0 is a
+    real exempt rate: trust it as soon as one line carries a rate, otherwise there is no
+    itemised data and only the document average says anything -#}
+{%- set nr = namespace(itemised=false) -%}
+{%- for it in doc.items -%}{%- if it.get("tax_rate") -%}{%- set nr.itemised = true -%}{%- endif -%}{%- endfor -%}
+{#- rich text is HTML with block ends: turn them into newlines before stripping tags per line,
+    striptags alone collapses every paragraph into one run -#}
+{%- macro as_lines(value) -%}
+	{%- set raw = (value or "") | replace("<br>", "\n") | replace("<br/>", "\n") | replace("<br />", "\n") | replace("</div>", "\n") | replace("</p>", "\n") | replace("</li>", "\n") -%}
+	{%- set nl = namespace(lines=[]) -%}
+	{%- for l in raw.split("\n") -%}
+		{%- set l = l | striptags | trim -%}
+		{%- if l -%}{%- set nl.lines = nl.lines + [l] -%}{%- endif -%}
+	{%- endfor -%}
+	{{- nl.lines | join("<br>") -}}
+{%- endmacro -%}
+{%- set validity = _("This quotation is valid until {0}. Prices exclude VAT unless stated.", context="quotation").format(frappe.utils.formatdate(doc.valid_till, "dd/mm/yyyy")) if doc.valid_till else _("Prices exclude VAT unless stated.", context="quotation") -%}
+{#- the terms field carries the contract text, printed whole under the table: the note box
+    next to the payment plan is the short free text the seller types per quotation -#}
+{%- set note = as_lines(doc.get("fab_notes")) | trim -%}
+{%- set terms = as_lines(doc.terms) | trim -%}
+
+{%- macro money(v) -%}{{ frappe.utils.fmt_money(v, 2) }}{%- endmacro -%}
+{%- macro qty(item) -%}
+	{%- set q = item.qty|int if item.qty == item.qty|int else item.qty -%}
+	{{ q }}{% if item.uom and item.uom not in plain_uoms %} {{ item.uom }}{% endif %}
+{%- endmacro -%}
+{%- macro pct(v) -%}{{ (v|int if v == v|int else v)|string }}%{%- endmacro -%}
+{%- macro vat_rate(item) -%}
+	{%- if nr.itemised -%}{{ pct(item.get("tax_rate") or 0) }}
+	{%- elif doc.net_total and doc.total_taxes_and_charges -%}{{ pct((doc.total_taxes_and_charges / doc.net_total * 100)|round(0)) }}
+	{%- else -%}0%{%- endif -%}
+{%- endmacro -%}
+{%- macro tax_label(tax) -%}
+	{%- set d = (tax.description or "") | striptags | trim -%}
+	{#- truncate() keeps short strings whole (leeway), so it never matched: test the prefix -#}
+	{%- if (d | lower).startswith("iva") %}{{ d }}{% else %}{{ _("VAT", context="invoice") }} {{ d }}{% endif -%}
+{%- endmacro -%}
+{%- macro line(item) -%}
+	{%- if item.get("fab_section") %}<tr class="band"><td colspan="6">{{ item.fab_section }}</td></tr>{% endif -%}
+	{%- set name = item.item_name or item.item_code -%}
+	{%- set code = item.item_code -%}
+	{%- if name.startswith("[") and "]" in name -%}
+		{%- set code = name[1:name.index("]")] -%}
+		{%- set name = name[name.index("]") + 1:].strip() -%}
+	{%- endif -%}
+	{#- description is plain text with newlines (imported) or HTML (editor): turn block ends into newlines before stripping tags per line -#}
+	{%- set raw = (item.description or "") | replace("<br>", "\n") | replace("<br/>", "\n") | replace("<br />", "\n") | replace("</div>", "\n") | replace("</p>", "\n") | replace("</li>", "\n") -%}
+	{%- set ns = namespace(lines=[]) -%}
+	{%- for l in raw.split("\n") -%}
+		{%- set l = l | striptags | trim -%}
+		{%- if l and not (loop.first and l == (item.item_name or "").strip()) -%}{%- set ns.lines = ns.lines + [l] -%}{%- endif -%}
+	{%- endfor -%}
+	{%- set lines = ns.lines -%}
+	<tr>
+		<td>{% if code %}<span class="code">{{ code }}</span> {% endif %}{{ name }}{% if lines %}<div class="sub">{{ lines | join("<br>") }}</div>{% endif %}</td>
+		<td class="n">{{ qty(item) }}</td>
+		{#- price before the line discount, so price, discount and amount read as one calculation.
+		    A discount typed as an amount leaves discount_percentage at 0: show its equivalent -#}
+		{%- set has_discount = item.discount_percentage or item.discount_amount -%}
+		{%- set list_price = item.price_list_rate or (item.rate + (item.discount_amount or 0)) -%}
+		{%- set discount_pct = item.discount_percentage or ((item.discount_amount / list_price * 100) | round(1) if item.discount_amount and list_price else 0) -%}
+		<td class="n">{{ money(list_price if has_discount else item.rate) }}</td>
+		<td class="n">{{ pct(discount_pct) }}</td>
+		<td class="n">{{ vat_rate(item) }}</td>
+		<td class="n">{{ money(item.amount) }} €</td>
+	</tr>
+	{%- if item.get("fab_note") %}<tr class="band note"><td colspan="6">{{ item.fab_note | striptags | replace("\n", "<br>") }}</td></tr>{% endif -%}
+{%- endmacro -%}
+
+{#- PDF metadata, applied by the chrome_pdfa generator (fab.print_format.get_pdf) -#}
+<meta name="pdf-title" content="{{ doc.name | replace("/", "-") }}">
+<meta name="pdf-author" content="{{ company.company_name }}">
+<script>
+/* Browser preview only (/printview, also inside the Print page iframe). The Chrome PDF generator
+   loads the site root and renders with Montserrat installed as a system font: no @font-face there,
+   it breaks text extraction. The browser gets the webfont, paper margins and a repeating footer. */
+(function(){
+	if (!/^\/printview/.test(location.pathname)) return;
+	var s = document.createElement("style");
+	s.textContent = [
+		'@font-face{font-family:Montserrat;font-weight:400;src:url(/assets/fab/fonts/Montserrat-Regular.ttf) format("truetype")}',
+		'@font-face{font-family:Montserrat;font-weight:600;src:url(/assets/fab/fonts/Montserrat-SemiBold.ttf) format("truetype")}',
+		'@font-face{font-family:Montserrat;font-weight:700;src:url(/assets/fab/fonts/Montserrat-Bold.ttf) format("truetype")}',
+		'@page{size:A4;margin:0}',
+		'@media print{.print-format-gutter .print-format{margin:0!important;padding:12mm 12mm 26mm!important;max-width:none!important}',
+		'#footer-html{display:block!important;position:fixed;bottom:0;left:0;right:0;padding:0 12mm 8mm;background:#fff}',
+		'#footer-html .cont,#footer-html .foot>div:last-child{display:none}}'
+	].join("\n");
+	document.head.appendChild(s);
+})();
+</script>
+<style>
+/* PDF-only blocks: the Chrome generator lifts their children into separate header/footer pages */
+#header-html,#footer-html{display:none}
+.print-format{margin-top:4mm;margin-bottom:5mm;margin-left:12mm;margin-right:12mm;page-size:A4;header-spacing:2}
+div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!important;color:#14110F!important;line-height:1.45!important}
+/* PDF: page margins come from the options above, the wrapper must not add its own */
+@media print{div.print-format{margin:0!important;padding:0!important;max-width:none!important;min-height:0!important}}
+/* browser preview: same paper margins as the PDF instead of Frappe's wide default padding */
+@media screen{.print-format-gutter .print-format{padding:10mm 12mm!important}}
+.reg{font-family:Montserrat,sans-serif;font-size:13.75px;color:#14110F;line-height:1.45}
+.reg *{box-sizing:border-box}
+.reg .hd{display:grid;grid-template-columns:1fr auto;gap:30px;align-items:end}
+.reg .hd .num{text-align:right}
+.reg .wm{height:42.5px;width:auto;display:block}
+.reg .tag{color:#FF6700;font-weight:600;font-size:13.13px;margin-top:5px}
+.reg .n1{font-size:11.88px;letter-spacing:.14em;text-transform:uppercase;color:#857B72;font-weight:600}
+.reg .n2{font-size:18.75px;font-weight:700;line-height:1.2;letter-spacing:.01em}
+.reg .n3{color:#FF6700;font-weight:600;font-size:12.5px;margin-top:2.5px}
+.reg .rail{margin-top:22.5px;border-top:2px solid #FF6700;border-bottom:1px solid #E3DCD4;display:grid;grid-template-columns:1.6fr 1fr 1.4fr;gap:15px 25px;padding:12.5px 0}
+.reg .lbl{font-size:11.88px;letter-spacing:.12em;text-transform:uppercase;color:#857B72;font-weight:600}
+.reg .v{font-weight:600;margin-top:1.25px}
+.reg .lbl+.v+.lbl{margin-top:8.75px}
+.reg .small{font-size:13.13px}
+.reg table.lines{width:100%;border-collapse:collapse;margin-top:17.5px;border:0}
+.reg table.lines thead{display:table-header-group}
+.reg table.lines tr{break-inside:avoid;page-break-inside:avoid}
+.reg table.lines tbody.closing{break-inside:avoid;page-break-inside:avoid}
+.reg table.lines th{text-align:left;font-size:11.88px;letter-spacing:.1em;text-transform:uppercase;color:#857B72;font-weight:600;padding:7.5px;border:0;border-bottom:1.5px solid #14110F;background:none}
+.reg table.lines td{padding:7.5px;font-size:13.75px;vertical-align:top;border:0;border-bottom:1px solid #E3DCD4;background:none}
+.reg .n{text-align:right;white-space:nowrap}
+.reg .code{color:#857B72;font-size:12.5px;letter-spacing:.04em}
+.reg .sub{color:#4A423C;font-size:12.5px;margin-top:2.5px}
+.reg table.lines tr.band td{background:#FAF7F3;font-style:italic;color:#4A423C;padding:7.5px 10px}
+.reg table.lines tr.band.note td{background:none;font-size:12.5px}
+.reg table.lines tr.sum td{border-bottom:0;padding-top:10px;font-weight:600}
+.reg table.lines tr.sum.grand td{color:#B84800;font-weight:700;font-size:15.63px;border-top:1.5px solid #14110F;padding-top:11.25px}
+.reg table.lines td.paycell{padding:0;border-bottom:0}
+.reg .two{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:22.5px;padding-top:15px;border-top:1px solid #E3DCD4}
+.reg .term{font-size:13.13px;line-height:1.35;margin-top:3.75px}
+.reg .term b,.reg .term .amt{white-space:nowrap}
+.reg .note{color:#857B72;font-size:12.5px;line-height:1.4;margin-top:3.75px}
+.reg .tc{margin-top:22.5px;padding-top:15px;border-top:1px solid #E3DCD4}
+.reg .tcbody{color:#4A423C;font-size:12.5px;line-height:1.45;margin-top:5px;text-align:justify}
+#header-html,#footer-html{font-family:Montserrat,sans-serif;color:#857B72}
+.hd2{display:flex;justify-content:space-between;align-items:center;padding:7.5px 0;border-bottom:2px solid #FF6700;white-space:nowrap;box-sizing:border-box;height:40px;overflow:hidden}
+.hd2 .wm2{height:22.5px;width:auto}
+.hd2 .seg{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:#857B72;font-weight:600}
+.hd2 .seg b{color:#14110F;letter-spacing:0;text-transform:none;font-size:13.75px}
+.wrapper:first-child .hd2{visibility:hidden}
+.fwrap{box-sizing:border-box;height:60px}
+.cont{text-align:right;font-size:12.5px;font-style:italic;height:17.5px;margin-bottom:12.5px;padding-right:3px}
+.foot{border-top:1px solid #E3DCD4;padding-top:12.5px;font-size:11.88px;display:flex;justify-content:space-between;white-space:nowrap}
+</style>
+
+<div id="header-html">
+	<div class="hd2"><img class="wm2" src="/assets/fab/images/fabricators-wordmark.png" alt=""><div class="seg"><b>{{ _("Quotation", context="quotation") }} {{ doc.name }}</b> · <span class="segl">{{ _("continued from page", context="invoice") }}</span> <span class="prev"></span><span class="page" style="display:none"></span></div></div>
+	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,v=String(p-1),el=w.querySelector(".prev");if(el.textContent!==v)el.textContent=v;});}).observe(document.documentElement,{childList:true,subtree:true});</script>
+</div>
+<div id="footer-html">
+	<div class="fwrap">
+		<div class="cont" data-label="{{ _("continues on page", context="invoice") }}"></div>
+		<div class="foot"><div>{{ company.company_name | upper }} · {{ _("VAT no.", context="invoice") }} {{ (company.tax_id or "") | replace("IT", "") }}{% if company.website %} · {{ company.website | replace("https://", "") | replace("http://", "") }}{% endif %}{% if company.email %} · {{ company.email }}{% endif %}{% if company.phone_no %} · {{ company.phone_no }}{% endif %}</div><div>{{ _("Page", context="invoice") }} <span class="page"></span>/<span class="topage"></span></div></div>
+	</div>
+	<script>new MutationObserver(function(){document.querySelectorAll(".wrapper").forEach(function(w){var p=parseInt(w.querySelector(".page").textContent)||1,t=parseInt(w.querySelector(".topage").textContent)||1,el=w.querySelector(".cont"),v=p<t?el.getAttribute("data-label")+" "+(p+1):"";if(el.textContent!==v)el.textContent=v;});}).observe(document.documentElement,{childList:true,subtree:true});</script>
+</div>
+
+<div class="reg">
+	<div class="hd">
+		<div><img class="wm" src="/assets/fab/images/fabricators-wordmark.png" alt="fabricators"><div class="tag">{{ _("Progetti per la qualità della vita", context="tagline") }}</div></div>
+		<div class="num">
+			<div class="n1">{{ _("Quotation", context="quotation") }}</div>
+			<div class="n2">{{ doc.name }}</div>
+			<div class="n3">{% if doc.docstatus == 0 %}{{ _("Draft", context="quotation") }}{% elif doc.docstatus == 2 %}{{ _("Cancelled", context="invoice") }}{% elif doc.valid_till %}{{ _("Valid until", context="quotation") }} {{ frappe.utils.formatdate(doc.valid_till, "dd/mm/yyyy") }}{% endif %}</div>
+		</div>
+	</div>
+	<div class="rail">
+		<div>
+			<div class="lbl">{{ _("Customer", context="invoice") }}</div>
+			<div class="v">{{ (doc.customer_name or doc.party_name) | upper }}</div>
+			<div class="small">{% if address %}{{ address.address_line1 | upper }}{% if address.address_line2 %} {{ address.address_line2 | upper }}{% endif %}, {{ address.pincode or "" }} {{ (address.city or "") | upper }}{% if address.state %} ({{ address.state | upper }}){% endif %}{% if address.country and address.country != "Italy" %}, {{ address.country }}{% endif %}{% endif %}{% if party and party.tax_id %} · {{ _("VAT no.", context="invoice") }} {{ party.tax_id }}{% endif %}{% if party and party.fiscal_code and party.fiscal_code != party.tax_id %} · {{ _("Tax code", context="invoice") }} {{ party.fiscal_code }}{% endif %}</div>
+		</div>
+		<div>
+			<div class="lbl">{{ _("Date", context="invoice") }}</div><div class="v">{{ frappe.utils.formatdate(doc.transaction_date, "dd/mm/yyyy") }}</div>
+			{%- if doc.valid_till %}
+			<div class="lbl">{{ _("Valid until", context="quotation") }}</div><div class="v">{{ frappe.utils.formatdate(doc.valid_till, "dd/mm/yyyy") }}</div>
+			{%- endif %}
+		</div>
+		<div>
+			<div class="lbl">{{ _("Payment", context="invoice") }}</div><div class="v">{{ payment }}</div>
+			<div class="lbl">{{ _("Total", context="invoice") }}</div><div class="v" style="color:#B84800">{{ money(doc.grand_total) }} €</div>
+		</div>
+	</div>
+
+	<table class="lines">
+		<thead><tr><th style="width:52%">{{ _("Description", context="invoice") }}</th><th class="n">{{ _("Qty", context="invoice") }}</th><th class="n">{{ _("Net", context="invoice") }}</th><th class="n">{{ _("Discount", context="invoice") }}</th><th class="n">{{ _("VAT", context="invoice") }}</th><th class="n">{{ _("Amount", context="invoice") }}</th></tr></thead>
+		<tbody>
+			{%- for item in doc.items[:split_at] %}{{ line(item) }}{% endfor %}
+		</tbody>
+		<tbody class="closing">
+			{%- for item in doc.items[split_at:] %}{{ line(item) }}{% endfor %}
+			{#- a discount on the net total is folded into Imponibile: spell it out or the lines will not add up -#}
+			{%- if doc.discount_amount and doc.apply_discount_on == "Net Total" %}
+			<tr class="sum"><td colspan="5" class="n">{{ _("Lines total", context="invoice") }}</td><td class="n">{{ money(doc.total) }} €</td></tr>
+			<tr class="sum"><td colspan="5" class="n">{{ _("Discount", context="invoice") }}{% if doc.additional_discount_percentage %} {{ pct(doc.additional_discount_percentage) }}{% endif %}</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>
+			{%- endif %}
+			<tr class="sum"><td colspan="5" class="n">{{ _("Taxable amount", context="invoice") }}</td><td class="n">{{ money(doc.net_total) }} €</td></tr>
+			{%- for tax in doc.taxes %}
+			<tr class="sum"><td colspan="5" class="n">{{ tax_label(tax) }}</td><td class="n">{{ money(tax.tax_amount) }} €</td></tr>
+			{%- endfor %}
+			{#- a grand-total discount comes after the taxes, so it is a separate step -#}
+			{%- if doc.discount_amount and doc.apply_discount_on == "Grand Total" %}<tr class="sum"><td colspan="5" class="n">{{ _("Discount", context="invoice") }}</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>{% endif %}
+			<tr class="sum grand"><td colspan="5" class="n">{{ _("Total", context="invoice") }}</td><td class="n">{{ money(doc.grand_total) }} €</td></tr>
+			<tr><td colspan="6" class="paycell">
+				<div class="two">
+					<div>
+						<div class="lbl">{{ payment }}</div>
+						{%- if show_schedule %}
+						{%- for row in schedule %}
+						{%- set label = ((row.description or "") | striptags | trim) or (row.payment_term or "") %}
+						<div class="term"><b>{{ pct(row.invoice_portion or 0) }}</b>{% if label %} · {{ label }}{% endif %} · <span class="amt">{{ money(row.payment_amount) }} €</span></div>
+						{%- endfor %}
+						{%- endif %}
+					</div>
+					<div>
+						<div class="lbl">{{ _("Notes", context="invoice") }}</div>
+						<div class="note">{{ note or validity }}</div>
+					</div>
+				</div>
+			</td></tr>
+		</tbody>
+	</table>
+	{%- if terms %}
+	{#- the contract text runs as long as it needs to and may break over pages, the closing
+	    block above stays together because it is a tbody of its own -#}
+	<div class="tc">
+		<div class="lbl">{{ _("Terms and conditions", context="quotation") }}</div>
+		<div class="tcbody">{{ terms }}</div>
+	</div>
+	{%- endif %}
+</div>

@@ -1,13 +1,15 @@
-"""Config-as-code for the FABRICATORS sales invoice print format."""
+"""Config-as-code for the FABRICATORS selling print formats."""
 
 import os
 
 import frappe
 
 PRINT_FORMAT = "Fattura FABRICATORS"
+QUOTATION_PRINT_FORMAT = "Preventivo FABRICATORS"
 PDF_GENERATOR = "chrome_pdfa"
 ICC_DIRS = ("/usr/share/color/icc/ghostscript", "/usr/share/ghostscript/iccprofiles", "/usr/share/color/icc")
 TEMPLATE = os.path.join(os.path.dirname(__file__), "print_formats", "sales_invoice_registro.html")
+QUOTATION_TEMPLATE = os.path.join(os.path.dirname(__file__), "print_formats", "quotation_registro.html")
 
 # Company contact facts printed in the invoice footer; only filled when empty so
 # a deliberate change on the site is never overwritten.
@@ -22,10 +24,12 @@ BANK_BIC = {"BANCA SELLA SPA": "SELBIT2BXXX"}
 def ensure_all():
 	if not frappe.db.exists("DocType", "Sales Invoice"):
 		return
-	ensure_invoice_line_fields()
+	ensure_print_fields()
 	ensure_company_billing_data()
 	ensure_system_fonts()
 	ensure_sales_invoice_print_format()
+	if frappe.db.exists("DocType", "Quotation"):
+		ensure_quotation_print_format()
 
 
 def ensure_system_fonts():
@@ -50,46 +54,56 @@ def ensure_system_fonts():
 		subprocess.run(["fc-cache", "-f"], check=False, capture_output=True)
 
 
-def ensure_invoice_line_fields():
-	"""Free lines around an invoice item, the way Odoo has section and note
+def ensure_print_fields():
+	"""Free lines around a printed item, the way Odoo has section and note
 	lines: a section heading printed as a band above the item and a note
-	printed under it. ERPNext has no item-less rows, so they hang on the item."""
+	printed under it. ERPNext has no item-less rows, so they hang on the item.
+	A quotation also gets its own note box, because its terms field carries the
+	contract text and is too long to sit next to the payment plan."""
 	from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
-	create_custom_fields(
+	fields = [
 		{
-			"Sales Invoice Item": [
-				{
-					"fieldname": "fab_print_section",
-					"fieldtype": "Section Break",
-					"label": "Print lines",
-					"insert_after": "description",
-					"collapsible": 1,
-				},
-				{
-					"fieldname": "fab_section",
-					"fieldtype": "Data",
-					"label": "Section heading",
-					"insert_after": "fab_print_section",
-					"description": "Printed as a band above this line.",
-				},
-				{
-					"fieldname": "fab_print_column",
-					"fieldtype": "Column Break",
-					"insert_after": "fab_section",
-				},
-				{
-					"fieldname": "fab_note",
-					"fieldtype": "Small Text",
-					"label": "Note",
-					"insert_after": "fab_print_column",
-					"description": "Printed under this line.",
-				},
-			]
+			"fieldname": "fab_print_section",
+			"fieldtype": "Section Break",
+			"label": "Print lines",
+			"insert_after": "description",
+			"collapsible": 1,
 		},
-		ignore_validate=True,
-		update=True,
-	)
+		{
+			"fieldname": "fab_section",
+			"fieldtype": "Data",
+			"label": "Section heading",
+			"insert_after": "fab_print_section",
+			"description": "Printed as a band above this line.",
+		},
+		{
+			"fieldname": "fab_print_column",
+			"fieldtype": "Column Break",
+			"insert_after": "fab_section",
+		},
+		{
+			"fieldname": "fab_note",
+			"fieldtype": "Small Text",
+			"label": "Note",
+			"insert_after": "fab_print_column",
+			"description": "Printed under this line.",
+		},
+	]
+	item_doctypes = ("Sales Invoice Item", "Quotation Item")
+	custom_fields = {d: fields for d in item_doctypes if frappe.db.exists("DocType", d)}
+	if frappe.db.exists("DocType", "Quotation"):
+		custom_fields["Quotation"] = [
+			{
+				"fieldname": "fab_notes",
+				"fieldtype": "Small Text",
+				"label": "Notes",
+				"insert_after": "terms",
+				"print_hide": 1,
+				"description": "Printed next to the payment plan on the FABRICATORS quotation.",
+			}
+		]
+	create_custom_fields(custom_fields, ignore_validate=True, update=True)
 
 
 def ensure_company_billing_data():
@@ -105,12 +119,20 @@ def ensure_company_billing_data():
 
 
 def ensure_sales_invoice_print_format():
+	ensure_print_format(PRINT_FORMAT, "Sales Invoice", TEMPLATE)
+
+
+def ensure_quotation_print_format():
+	ensure_print_format(QUOTATION_PRINT_FORMAT, "Quotation", QUOTATION_TEMPLATE)
+
+
+def ensure_print_format(name, doctype, template):
 	"""Create or refresh the print format from the template file and make it the
-	Sales Invoice default. Rendered by the Chrome PDF generator."""
-	with open(TEMPLATE, encoding="utf-8") as f:
+	doctype default. Rendered by the Chrome PDF generator."""
+	with open(template, encoding="utf-8") as f:
 		html = f.read()
 	values = {
-		"doc_type": "Sales Invoice",
+		"doc_type": doctype,
 		"module": "FAB",
 		"standard": "No",
 		"custom_format": 1,
@@ -131,20 +153,20 @@ def ensure_sales_invoice_print_format():
 		},
 		validate_fields_for_doctype=False,
 	)
-	if frappe.db.exists("Print Format", PRINT_FORMAT):
-		doc = frappe.get_doc("Print Format", PRINT_FORMAT)
+	if frappe.db.exists("Print Format", name):
+		doc = frappe.get_doc("Print Format", name)
 		if any(doc.get(k) != v for k, v in values.items()):
 			doc.update(values)
 			doc.save(ignore_permissions=True)
 	else:
-		doc = frappe.get_doc({"doctype": "Print Format", "name": PRINT_FORMAT, **values})
+		doc = frappe.get_doc({"doctype": "Print Format", "name": name, **values})
 		doc.insert(ignore_permissions=True)
 	frappe.make_property_setter(
 		{
-			"doctype": "Sales Invoice",
+			"doctype": doctype,
 			"doctype_or_field": "DocType",
 			"property": "default_print_format",
-			"value": PRINT_FORMAT,
+			"value": name,
 			"property_type": "Data",
 		},
 		validate_fields_for_doctype=False,

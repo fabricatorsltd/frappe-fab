@@ -162,6 +162,15 @@ msgctxt "quotation"
 msgid "Prices exclude VAT unless stated."
 msgstr "Prix hors TVA sauf indication contraire."
 
+msgctxt "quotation"
+msgid "Terms and conditions"
+msgstr "Conditions générales"
+
+# Label of the quotation note field, translated without context by the form
+
+msgid "Notes"
+msgstr "Notes"
+
 msgid "Wire Transfer"
 msgstr "Virement bancaire"
 
