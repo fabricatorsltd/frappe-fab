@@ -40,7 +40,7 @@
 {#- rich text is HTML with block ends: turn them into newlines before stripping tags per line,
     striptags alone collapses every paragraph into one run -#}
 {%- macro as_lines(value) -%}
-	{%- set raw = (value or "") | replace("<br>", "\n") | replace("<br/>", "\n") | replace("<br />", "\n") | replace("</div>", "\n") | replace("</p>", "\n") | replace("</li>", "\n") -%}
+	{%- set raw = (value or "") | replace("<br>", "\n") | replace("<br/>", "\n") | replace("<br />", "\n") | replace("</div>", "\n") | replace("</p>", "\n") | replace("<li>", "\n&bull; ") | replace("</li>", "\n") -%}
 	{%- set nl = namespace(lines=[]) -%}
 	{%- for l in raw.split("\n") -%}
 		{%- set l = l | striptags | trim -%}
@@ -90,7 +90,7 @@
 		{%- set name = name[name.index("]") + 1:].strip() -%}
 	{%- endif -%}
 	{#- description is plain text with newlines (imported) or HTML (editor): turn block ends into newlines before stripping tags per line -#}
-	{%- set raw = (item.description or "") | replace("<br>", "\n") | replace("<br/>", "\n") | replace("<br />", "\n") | replace("</div>", "\n") | replace("</p>", "\n") | replace("</li>", "\n") -%}
+	{%- set raw = (item.description or "") | replace("<br>", "\n") | replace("<br/>", "\n") | replace("<br />", "\n") | replace("</div>", "\n") | replace("</p>", "\n") | replace("<li>", "\n&bull; ") | replace("</li>", "\n") -%}
 	{%- set ns = namespace(lines=[]) -%}
 	{%- for l in raw.split("\n") -%}
 		{%- set l = l | striptags | trim -%}
