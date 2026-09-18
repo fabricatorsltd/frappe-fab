@@ -13,12 +13,24 @@
 {%- for row in schedule -%}{%- if (row.description or "") | striptags | trim -%}{%- set nd.described = true -%}{%- endif -%}{%- endfor -%}
 {#- a single 100% row with no wording says nothing the payment line does not already say -#}
 {%- set show_schedule = schedule | length > 1 or nd.described -%}
+{#- the offer is the plain rows: an alternative rides under the row it replaces and an
+    optional row is quoted apart, and neither is counted in the totals -#}
+{%- set rows = namespace(offer=[], optional=[]) -%}
+{%- for item in doc.items -%}
+	{%- if item.get("is_alternative") -%}
+		{%- if rows.offer -%}{%- set _ = rows.offer[-1]["alts"].append(item) -%}{%- endif -%}
+	{%- elif item.get("fab_is_optional") -%}
+		{%- set rows.optional = rows.optional + [item] -%}
+	{%- else -%}
+		{%- set rows.offer = rows.offer + [{"row": item, "alts": []}] -%}
+	{%- endif -%}
+{%- endfor -%}
 {#- the totals travel with the last line so they never open a page alone, but only
     when that line is short: a long description dragged along leaves a blank page -#}
-{%- set last_item = doc.items[-1] if doc.items else None -%}
-{%- set last_is_short = last_item and not last_item.get("fab_note") and ((last_item.description or "") | striptags | trim | length) <= 120 -%}
-{%- set closing_rows = 1 if doc.items|length > 1 and last_is_short else 0 -%}
-{%- set split_at = doc.items|length - closing_rows -%}
+{%- set last_entry = rows.offer[-1] if rows.offer else None -%}
+{%- set last_is_short = last_entry and not last_entry["alts"] and not last_entry["row"].get("fab_note") and ((last_entry["row"].description or "") | striptags | trim | length) <= 120 -%}
+{%- set closing_rows = 1 if rows.offer|length > 1 and last_is_short else 0 -%}
+{%- set split_at = rows.offer|length - closing_rows -%}
 {%- set plain_uoms = ["NR", "Nos", "Unit", "Pz", "PZ"] -%}
 {#- the Italian regional hook fills the per line tax_rate from the itemised tax, where 0 is a
     real exempt rate: trust it as soon as one line carries a rate, otherwise there is no
@@ -50,18 +62,27 @@
 	{{ q }}{% if item.uom and item.uom not in plain_uoms %} {{ item.uom }}{% endif %}
 {%- endmacro -%}
 {%- macro pct(v) -%}{{ (v|int if v == v|int else v)|string }}%{%- endmacro -%}
+{%- macro doc_vat_rate() -%}
+	{%- if doc.net_total and doc.total_taxes_and_charges -%}{{ pct((doc.total_taxes_and_charges / doc.net_total * 100)|round(0)) }}
+	{%- else -%}0%{%- endif -%}
+{%- endmacro -%}
 {%- macro vat_rate(item) -%}
 	{%- if nr.itemised -%}{{ pct(item.get("tax_rate") or 0) }}
-	{%- elif doc.net_total and doc.total_taxes_and_charges -%}{{ pct((doc.total_taxes_and_charges / doc.net_total * 100)|round(0)) }}
-	{%- else -%}0%{%- endif -%}
+	{%- else -%}{{ doc_vat_rate() }}{%- endif -%}
+{%- endmacro -%}
+{#- an alternative or optional row is outside the tax computation, so it never gets an
+    itemised rate: quote it at the rate the offer itself is taxed at -#}
+{%- macro vat_rate_apart(item) -%}
+	{%- if item.get("tax_rate") -%}{{ pct(item.tax_rate) }}
+	{%- else -%}{{ doc_vat_rate() }}{%- endif -%}
 {%- endmacro -%}
 {%- macro tax_label(tax) -%}
 	{%- set d = (tax.description or "") | striptags | trim -%}
 	{#- truncate() keeps short strings whole (leeway), so it never matched: test the prefix -#}
 	{%- if (d | lower).startswith("iva") %}{{ d }}{% else %}{{ _("VAT", context="invoice") }} {{ d }}{% endif -%}
 {%- endmacro -%}
-{%- macro line(item) -%}
-	{%- if item.get("fab_section") %}<tr class="band"><td colspan="6">{{ item.fab_section }}</td></tr>{% endif -%}
+{#- the item cell: code, name and the description lines under it -#}
+{%- macro item_cell(item) -%}
 	{%- set name = item.item_name or item.item_code -%}
 	{%- set code = item.item_code -%}
 	{%- if name.startswith("[") and "]" in name -%}
@@ -75,21 +96,40 @@
 		{%- set l = l | striptags | trim -%}
 		{%- if l and not (loop.first and l == (item.item_name or "").strip()) -%}{%- set ns.lines = ns.lines + [l] -%}{%- endif -%}
 	{%- endfor -%}
-	{%- set lines = ns.lines -%}
+	{%- if code %}<span class="code">{{ code }}</span> {% endif %}{{ name }}{% if ns.lines %}<div class="sub">{{ ns.lines | join("<br>") }}</div>{% endif -%}
+{%- endmacro -%}
+{#- quantity, price before the line discount, discount, VAT and amount, so price,
+    discount and amount read as one calculation. A discount typed as an amount leaves
+    discount_percentage at 0: show its equivalent -#}
+{%- macro number_cells(item, apart=false) -%}
+	{%- set has_discount = item.discount_percentage or item.discount_amount -%}
+	{%- set list_price = item.price_list_rate or (item.rate + (item.discount_amount or 0)) -%}
+	{%- set discount_pct = item.discount_percentage or ((item.discount_amount / list_price * 100) | round(1) if item.discount_amount and list_price else 0) -%}
+	<td class="n">{{ qty(item) }}</td>
+	<td class="n">{{ money(list_price if has_discount else item.rate) }}</td>
+	<td class="n">{{ pct(discount_pct) }}</td>
+	<td class="n">{% if apart %}{{ vat_rate_apart(item) }}{% else %}{{ vat_rate(item) }}{% endif %}</td>
+	<td class="n">{{ money(item.amount) }} €</td>
+{%- endmacro -%}
+{%- macro line(item, apart=false) -%}
+	{%- if item.get("fab_section") %}<tr class="band"><td colspan="6">{{ item.fab_section }}</td></tr>{% endif -%}
 	<tr>
-		<td>{% if code %}<span class="code">{{ code }}</span> {% endif %}{{ name }}{% if lines %}<div class="sub">{{ lines | join("<br>") }}</div>{% endif %}</td>
-		<td class="n">{{ qty(item) }}</td>
-		{#- price before the line discount, so price, discount and amount read as one calculation.
-		    A discount typed as an amount leaves discount_percentage at 0: show its equivalent -#}
-		{%- set has_discount = item.discount_percentage or item.discount_amount -%}
-		{%- set list_price = item.price_list_rate or (item.rate + (item.discount_amount or 0)) -%}
-		{%- set discount_pct = item.discount_percentage or ((item.discount_amount / list_price * 100) | round(1) if item.discount_amount and list_price else 0) -%}
-		<td class="n">{{ money(list_price if has_discount else item.rate) }}</td>
-		<td class="n">{{ pct(discount_pct) }}</td>
-		<td class="n">{{ vat_rate(item) }}</td>
-		<td class="n">{{ money(item.amount) }} €</td>
+		<td>{{ item_cell(item) }}</td>
+		{{- number_cells(item, apart) }}
 	</tr>
 	{%- if item.get("fab_note") %}<tr class="band note"><td colspan="6">{{ item.fab_note | striptags | replace("\n", "<br>") }}</td></tr>{% endif -%}
+{%- endmacro -%}
+{#- an alternative replaces the row above it: printed under that row, with its price,
+    and outside every total on the page -#}
+{%- macro alternative(item) -%}
+	<tr class="band alt">
+		<td><span class="altlbl">{{ _("As an alternative", context="quotation") }}:</span> {{ item_cell(item) }}</td>
+		{{- number_cells(item, true) }}
+	</tr>
+{%- endmacro -%}
+{%- macro offer_line(entry) -%}
+	{{- line(entry["row"]) -}}
+	{%- for alt in entry["alts"] %}{{ alternative(alt) }}{% endfor -%}
 {%- endmacro -%}
 
 {#- PDF metadata, applied by the chrome_pdfa generator (fab.print_format.get_pdf) -#}
@@ -148,6 +188,12 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 .reg .sub{color:#4A423C;font-size:12.5px;margin-top:2.5px}
 .reg table.lines tr.band td{background:#FAF7F3;font-style:italic;color:#4A423C;padding:7.5px 10px}
 .reg table.lines tr.band.note td{background:none;font-size:12.5px}
+.reg table.lines tr.band.alt td{font-style:normal;font-size:13.13px}
+.reg table.lines tr.band.alt td:first-child{padding-left:25px}
+.reg .altlbl{font-style:italic;color:#857B72;margin-right:3px}
+.reg .opt{margin-top:22.5px;padding-top:15px;border-top:1px solid #E3DCD4;break-inside:avoid;page-break-inside:avoid}
+.reg .opt table.lines{margin-top:6.25px}
+.reg .opt table.lines td{color:#4A423C;font-size:13.13px}
 .reg table.lines tr.sum td{border-bottom:0;padding-top:10px;font-weight:600}
 .reg table.lines tr.sum.grand td{color:#B84800;font-weight:700;font-size:15.63px;border-top:1.5px solid #14110F;padding-top:11.25px}
 .reg table.lines td.paycell{padding:0;border-bottom:0}
@@ -218,10 +264,10 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 	<table class="lines">
 		<thead><tr><th style="width:52%">{{ _("Description", context="invoice") }}</th><th class="n">{{ _("Qty", context="invoice") }}</th><th class="n">{{ _("Net", context="invoice") }}</th><th class="n">{{ _("Discount", context="invoice") }}</th><th class="n">{{ _("VAT", context="invoice") }}</th><th class="n">{{ _("Amount", context="invoice") }}</th></tr></thead>
 		<tbody>
-			{%- for item in doc.items[:split_at] %}{{ line(item) }}{% endfor %}
+			{%- for entry in rows.offer[:split_at] %}{{ offer_line(entry) }}{% endfor %}
 		</tbody>
 		<tbody class="closing">
-			{%- for item in doc.items[split_at:] %}{{ line(item) }}{% endfor %}
+			{%- for entry in rows.offer[split_at:] %}{{ offer_line(entry) }}{% endfor %}
 			{#- a discount on the net total is folded into Imponibile: spell it out or the lines will not add up -#}
 			{%- if doc.discount_amount and doc.apply_discount_on == "Net Total" %}
 			<tr class="sum"><td colspan="5" class="n">{{ _("Lines total", context="invoice") }}</td><td class="n">{{ money(doc.total) }} €</td></tr>
@@ -253,6 +299,19 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 			</td></tr>
 		</tbody>
 	</table>
+	{%- if rows.optional %}
+	{#- extras the customer may add: quoted with their price, outside every total above -#}
+	<div class="opt">
+		<div class="lbl">{{ _("Optional items", context="quotation") }}</div>
+		<table class="lines">
+			<thead><tr><th style="width:52%">{{ _("Description", context="invoice") }}</th><th class="n">{{ _("Qty", context="invoice") }}</th><th class="n">{{ _("Net", context="invoice") }}</th><th class="n">{{ _("Discount", context="invoice") }}</th><th class="n">{{ _("VAT", context="invoice") }}</th><th class="n">{{ _("Amount", context="invoice") }}</th></tr></thead>
+			<tbody>
+				{%- for item in rows.optional %}{{ line(item, true) }}{% endfor %}
+			</tbody>
+		</table>
+		<div class="note">{{ _("Not included in the total", context="quotation") }}</div>
+	</div>
+	{%- endif %}
 	{%- if terms %}
 	{#- the contract text always opens on a page of its own, after the offer, and may run
 	    over several pages; the closing block above stays together because it is a tbody -#}

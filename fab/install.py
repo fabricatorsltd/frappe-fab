@@ -94,6 +94,7 @@ def after_install():
 	ensure_invoice_language_is_editable()
 	ensure_max_discount_override()
 	ensure_selling_grid_columns()
+	ensure_optional_items()
 
 
 def after_migrate():
@@ -105,6 +106,7 @@ def after_migrate():
 	ensure_invoice_language_is_editable()
 	ensure_max_discount_override()
 	ensure_selling_grid_columns()
+	ensure_optional_items()
 
 
 # Item rows of the selling documents, where the list price and the discount are
@@ -129,6 +131,33 @@ def ensure_selling_grid_columns():
 				},
 				validate_fields_for_doctype=False,
 			)
+
+
+def ensure_optional_items():
+	"""Odoo style optional lines on a quotation: an extra item the customer may add,
+	quoted with its price but kept out of the totals until it is picked at order
+	conversion. ERPNext only knows alternative rows, which replace the row above."""
+	if not frappe.db.exists("DocType", "Quotation Item"):
+		return
+
+	create_custom_fields(
+		{
+			"Quotation Item": [
+				{
+					"fieldname": "fab_is_optional",
+					"fieldtype": "Check",
+					"label": "Optional",
+					"insert_after": "is_alternative",
+					"in_list_view": 0,
+					# the flag decides the totals, so it cannot move after submit
+					"allow_on_submit": 0,
+					# the format prints the optional lines in a table of their own
+					"print_hide": 1,
+				}
+			]
+		},
+		update=True,
+	)
 
 
 # Selling documents where a sales manager may waive the item max_discount, see

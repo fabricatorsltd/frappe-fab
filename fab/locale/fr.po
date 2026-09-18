@@ -166,6 +166,44 @@ msgctxt "quotation"
 msgid "Terms and conditions"
 msgstr "Conditions générales"
 
+msgctxt "quotation"
+msgid "As an alternative"
+msgstr "En alternative"
+
+msgctxt "quotation"
+msgid "Optional items"
+msgstr "Options"
+
+msgctxt "quotation"
+msgid "Not included in the total"
+msgstr "Non inclus dans le total"
+
+# Optional quotation lines: the row flag, the conversion dialog and the checks
+
+msgid "Optional"
+msgstr "Optionnel"
+
+msgid "Alternative Items"
+msgstr "Articles alternatifs"
+
+msgid "Optional Items"
+msgstr "Articles optionnels"
+
+msgid "Select Items for Sales Order"
+msgstr "Sélectionnez les articles pour la commande client"
+
+msgid "Tick one item from each alternatives set and every optional item the customer ordered."
+msgstr "Cochez un article de chaque ensemble d'alternatives et chaque article optionnel commandé par le client."
+
+msgid "Row {0}: an item cannot be optional and alternative at the same time."
+msgstr "Ligne {0} : un article ne peut pas être optionnel et alternatif à la fois."
+
+msgid "Row {0}: an optional item cannot have alternative items."
+msgstr "Ligne {0} : un article optionnel ne peut pas avoir d'alternatives."
+
+msgid "Row {0} is an alternative to the optional item in row {1}."
+msgstr "La ligne {0} est une alternative à l'article optionnel de la ligne {1}."
+
 # Label of the quotation note field, translated without context by the form
 
 msgid "Notes"
