@@ -195,17 +195,22 @@ div.print-format{font-family:Montserrat,sans-serif!important;font-size:13.75px!i
 		</tbody>
 		<tbody class="closing">
 			{%- for item in doc.items[split_at:] %}{{ line(item) }}{% endfor %}
-			{#- a discount on the net total is folded into Imponibile: spell it out or the lines will not add up -#}
-			{%- if doc.discount_amount and doc.apply_discount_on == "Net Total" %}
+			{#- ERPNext freezes tax.tax_amount at its pre-discount value when the discount is on the grand
+			    total, so the rows print tax_amount_after_discount_amount, the VAT the XML and the ledger carry -#}
+			{%- set net_share = doc.net_total - doc.total -%}
+			{%- set discount_after_tax = doc.discount_amount and not net_share -%}
+			{%- if doc.discount_amount and net_share %}
 			<tr class="sum"><td colspan="5" class="n">{{ _("Lines total", context="invoice") }}</td><td class="n">{{ money(doc.total) }} €</td></tr>
-			<tr class="sum"><td colspan="5" class="n">{{ _("Discount", context="invoice") }}{% if doc.additional_discount_percentage %} {{ pct(doc.additional_discount_percentage) }}{% endif %}</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>
+			<tr class="sum"><td colspan="5" class="n">{{ _("Discount", context="invoice") }}{% if doc.additional_discount_percentage %} {{ pct(doc.additional_discount_percentage) }}{% endif %}</td><td class="n">{{ money(net_share) }} €</td></tr>
 			{%- endif %}
 			<tr class="sum"><td colspan="5" class="n">{{ _("Taxable amount", context="invoice") }}</td><td class="n">{{ money(doc.net_total) }} €</td></tr>
 			{%- for tax in doc.taxes %}
-			<tr class="sum"><td colspan="5" class="n">{{ tax_label(tax) }}</td><td class="n">{{ money(tax.tax_amount) }} €</td></tr>
+			<tr class="sum"><td colspan="5" class="n">{{ tax_label(tax) }}</td><td class="n">{{ money(tax.tax_amount_after_discount_amount or tax.tax_amount) }} €</td></tr>
 			{%- endfor %}
-			{#- a grand-total discount comes after the taxes, so it is a separate step -#}
-			{%- if doc.discount_amount and doc.apply_discount_on == "Grand Total" %}<tr class="sum"><td colspan="5" class="n">{{ _("Discount", context="invoice") }}</td><td class="n">-{{ money(doc.discount_amount) }} €</td></tr>{% endif %}
+			{%- if discount_after_tax %}
+			{#- a cash discount is not redistributed, so it lands after the taxes -#}
+			<tr class="sum"><td colspan="5" class="n">{{ _("Discount", context="invoice") }}{% if doc.additional_discount_percentage %} {{ pct(doc.additional_discount_percentage) }}{% endif %}</td><td class="n">{{ money(-doc.discount_amount) }} €</td></tr>
+			{%- endif %}
 			<tr class="sum grand"><td colspan="5" class="n">{{ _("Total", context="invoice") }}</td><td class="n">{{ money(doc.grand_total) }} €</td></tr>
 			<tr><td colspan="6" class="paycell">
 				<div class="two">
