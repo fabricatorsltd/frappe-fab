@@ -27269,3 +27269,9 @@ msgstr "Indica un motivo per derogare allo sconto massimo."
 
 msgid "Only a Sales Manager can override the maximum discount."
 msgstr "Solo un Sales Manager può derogare allo sconto massimo."
+
+msgid "Reason for impersonating"
+msgstr "Motivo dell'impersonificazione"
+
+msgid "Kept in the Activity Log. The user is not notified."
+msgstr "Resta nel Log Attività. L'utente non riceve nessun avviso."
