@@ -95,6 +95,7 @@ def after_install():
 	ensure_max_discount_override()
 	ensure_selling_grid_columns()
 	ensure_optional_items()
+	ensure_mobile_oauth_client()
 
 
 def after_migrate():
@@ -107,6 +108,39 @@ def after_migrate():
 	ensure_max_discount_override()
 	ensure_selling_grid_columns()
 	ensure_optional_items()
+	ensure_mobile_oauth_client()
+
+
+def ensure_mobile_oauth_client():
+	"""Public PKCE client of the mobile app. OAuth Client copies its name into
+	client_id, so inserting it under a fixed name gives the app a client_id it can
+	hardcode on every site. The redirect is the site's own https callback, so it
+	follows host_name."""
+	from fab.mobile import MOBILE_OAUTH_CLIENT, get_mobile_redirect_uri
+
+	redirect_uri = get_mobile_redirect_uri()
+	values = {
+		"app_name": "Fab Mobile",
+		"grant_type": "Authorization Code",
+		"response_type": "Code",
+		"skip_authorization": 1,
+		"redirect_uris": redirect_uri,
+		"default_redirect_uri": redirect_uri,
+		"scopes": "all openid",
+		"token_endpoint_auth_method": "None",
+	}
+	if not frappe.db.exists("OAuth Client", MOBILE_OAUTH_CLIENT):
+		frappe.get_doc({"doctype": "OAuth Client", **values}).insert(
+			ignore_permissions=True, set_name=MOBILE_OAUTH_CLIENT
+		)
+		return
+
+	doc = frappe.get_doc("OAuth Client", MOBILE_OAUTH_CLIENT)
+	# only desk users, as the default for a new client, but kept against edits by hand
+	if [row.role for row in doc.allowed_roles] != ["Desk User"]:
+		doc.set("allowed_roles", [{"role": "Desk User"}])
+		doc.save(ignore_permissions=True)
+	update_doc(doc, values)
 
 
 # Item rows of the selling documents, where the list price and the discount are

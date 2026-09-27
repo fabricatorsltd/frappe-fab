@@ -225,3 +225,62 @@ msgstr "Indiquez un motif pour déroger à la remise maximale."
 
 msgid "Only a Sales Manager can override the maximum discount."
 msgstr "Seul un Sales Manager peut déroger à la remise maximale."
+
+# Mobile app
+
+msgid "Mobile Device"
+msgstr "Appareil mobile"
+
+msgid "Platform"
+msgstr "Plateforme"
+
+msgid "Push Token"
+msgstr "Jeton push"
+
+msgid "Device Name"
+msgstr "Nom de l'appareil"
+
+msgid "App Version"
+msgstr "Version de l'app"
+
+msgid "Last Seen"
+msgstr "Dernier accès"
+
+msgid "{0} opened a session from the mobile app"
+msgstr "{0} a ouvert une session depuis l'app mobile"
+
+msgid "A valid mobile app access token is required."
+msgstr "Un jeton d'accès valide de l'app mobile est requis."
+
+msgid "Invalid refresh token."
+msgstr "Jeton de rafraîchissement non valide."
+
+msgid "The mobile app is for system users only."
+msgstr "L'app mobile est réservée aux utilisateurs système."
+
+msgid "Too many device registrations, try again later."
+msgstr "Trop d'enregistrements d'appareils, réessayez plus tard."
+
+msgid "Not available while impersonating a user."
+msgstr "Indisponible pendant l'emprunt d'identité d'un utilisateur."
+
+msgid "The mobile app must sign in with PKCE (S256)."
+msgstr "L'app mobile doit se connecter avec PKCE (S256)."
+
+msgid "Grant type not allowed for the mobile app."
+msgstr "Type de grant non autorisé pour l'app mobile."
+
+msgid "The authorization code has expired."
+msgstr "Le code d'autorisation a expiré."
+
+msgid "Reused mobile app refresh token, all mobile app sessions revoked"
+msgstr "Jeton de rafraîchissement de l'app mobile réutilisé, toutes les sessions de l'app mobile révoquées"
+
+msgid "Open the Fabricators app"
+msgstr "Ouvrez l'app Fabricators"
+
+msgid "If the app did not open, open it yourself to finish signing in."
+msgstr "Si l'app ne s'est pas ouverte, ouvrez-la vous-même pour terminer la connexion."
+
+msgid "New notification"
+msgstr "Nouvelle notification"

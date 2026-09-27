@@ -27275,3 +27275,62 @@ msgstr "Motivo dell'impersonificazione"
 
 msgid "Kept in the Activity Log. The user is not notified."
 msgstr "Resta nel Log Attività. L'utente non riceve nessun avviso."
+
+# Mobile app
+
+msgid "Mobile Device"
+msgstr "Dispositivo mobile"
+
+msgid "Platform"
+msgstr "Piattaforma"
+
+msgid "Push Token"
+msgstr "Token push"
+
+msgid "Device Name"
+msgstr "Nome dispositivo"
+
+msgid "App Version"
+msgstr "Versione app"
+
+msgid "Last Seen"
+msgstr "Ultimo accesso"
+
+msgid "{0} opened a session from the mobile app"
+msgstr "{0} ha aperto una sessione dall'app mobile"
+
+msgid "A valid mobile app access token is required."
+msgstr "Serve un token di accesso valido dell'app mobile."
+
+msgid "Invalid refresh token."
+msgstr "Token di aggiornamento non valido."
+
+msgid "The mobile app is for system users only."
+msgstr "L'app mobile è riservata agli utenti di sistema."
+
+msgid "Too many device registrations, try again later."
+msgstr "Troppe registrazioni di dispositivi, riprova più tardi."
+
+msgid "Not available while impersonating a user."
+msgstr "Non disponibile mentre impersonifichi un utente."
+
+msgid "The mobile app must sign in with PKCE (S256)."
+msgstr "L'app mobile deve accedere con PKCE (S256)."
+
+msgid "Grant type not allowed for the mobile app."
+msgstr "Tipo di grant non consentito per l'app mobile."
+
+msgid "The authorization code has expired."
+msgstr "Il codice di autorizzazione è scaduto."
+
+msgid "Reused mobile app refresh token, all mobile app sessions revoked"
+msgstr "Token di aggiornamento dell'app mobile riutilizzato, tutte le sessioni dell'app mobile revocate"
+
+msgid "Open the Fabricators app"
+msgstr "Apri l'app Fabricators"
+
+msgid "If the app did not open, open it yourself to finish signing in."
+msgstr "Se l'app non si è aperta, aprila tu per completare l'accesso."
+
+msgid "New notification"
+msgstr "Nuova notifica"

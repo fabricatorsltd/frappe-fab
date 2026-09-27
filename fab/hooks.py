@@ -139,13 +139,13 @@ after_app_install = "fab.install.after_app_install"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+permission_query_conditions = {
+	"Mobile Device": "fab.fab.doctype.mobile_device.mobile_device.get_permission_query_conditions",
+}
+
+has_permission = {
+	"Mobile Device": "fab.fab.doctype.mobile_device.mobile_device.has_permission",
+}
 
 # Document Events
 # ---------------
@@ -156,6 +156,20 @@ after_app_install = "fab.install.after_app_install"
 doc_events = {
 	"Communication": {
 		"before_insert": "fab.email_routing.route_billing_sender",
+	},
+	# mobile app: push the desk bell to the phones, PKCE, grant and refresh rules on
+	# the Fab Mobile OAuth client, sign the app out of disabled users and new passwords
+	"Notification Log": {
+		"after_insert": "fab.mobile.notify_devices",
+	},
+	"OAuth Authorization Code": {
+		"before_insert": "fab.mobile.check_authorization_code",
+	},
+	"OAuth Bearer Token": {
+		"before_insert": "fab.mobile.check_bearer_token",
+	},
+	"User": {
+		"on_update": "fab.mobile.on_user_update",
 	},
 }
 
@@ -211,6 +225,7 @@ override_doctype_class = {
 override_whitelisted_methods = {
 	"erpnext.selling.doctype.quotation.quotation.make_sales_order": "fab.overrides.selling.make_sales_order",
 	"frappe.core.doctype.user.user.impersonate": "fab.overrides.user.impersonate",
+	"frappe.core.doctype.user.user.update_password": "fab.overrides.user.update_password",
 }
 #
 # each overriding function accepts a `data` argument;
@@ -232,7 +247,9 @@ override_whitelisted_methods = {
 # Request Events
 # ----------------
 # PDF downloads without an explicit generator must follow the print format.
-before_request = ["fab.print_format.set_pdf_generator"]
+# The mobile app link files and callback page are answered before Frappe's own
+# /.well-known/ handler, see fab.mobile.serve_mobile_paths.
+before_request = ["fab.print_format.set_pdf_generator", "fab.mobile.before_request"]
 # "chrome_pdfa": Chrome render closed as PDF/A-2b (see fab.print_format.get_pdf)
 pdf_generator = "fab.print_format.get_pdf"
 # after_request = ["fab.utils.after_request"]
